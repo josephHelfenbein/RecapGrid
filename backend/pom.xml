@@ -13,6 +13,20 @@
       <version>3.2.2</version>
       <relativePath/>
   </parent>
+  <pluginRepositories>
+      <pluginRepository>
+          <id>central</id>
+          <url>https://repo.maven.apache.org/maven2</url>
+      </pluginRepository>
+  </pluginRepositories>
+  <build>
+      <plugins>
+          <plugin>
+              <groupId>org.springframework.boot</groupId>
+              <artifactId>spring-boot-maven-plugin</artifactId>
+          </plugin>
+      </plugins>
+  </build>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
