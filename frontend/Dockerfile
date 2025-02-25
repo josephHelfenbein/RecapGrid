@@ -14,7 +14,7 @@ FROM nginx:alpine
 
 WORKDIR /usr/share/nginx/html
 
-COPY --from=frontend-build /app/.output/public /usr/share/nginx/html
+COPY --from=frontend-build /app/.output /usr/share/nginx/html
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY entrypoint.sh /entrypoint.sh
