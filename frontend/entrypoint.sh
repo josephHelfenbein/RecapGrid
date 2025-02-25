@@ -1,7 +1,7 @@
 #!/bin/sh
+set -e
 
-export API_URL="${API_URL:-http://localhost:8080}"
+envsubst '${API_URL}' < /etc/nginx/nginx.conf > /etc/nginx/nginx.conf.tmp
+mv /etc/nginx/nginx.conf.tmp /etc/nginx/nginx.conf
 
-pnpm start &
-
-nginx -g 'daemon off;'
+exec nginx -g 'daemon off;'
