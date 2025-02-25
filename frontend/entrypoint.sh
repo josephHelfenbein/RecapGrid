@@ -1,8 +1,5 @@
 #!/bin/sh
-set -e
 
-envsubst '$API_URL $PORT' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+export API_URL=${API_URL:-"http://localhost:8080"}
 
-nuxt start -p 8080 &
-
-exec nginx -g 'daemon off;'
+nginx -g 'daemon off;'
