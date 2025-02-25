@@ -10,16 +10,20 @@ RUN pnpm install --frozen-lockfile
 COPY / ./
 RUN pnpm build
 
-FROM nginx:alpine
+FROM node:18 AS frontend-ssr
 
-WORKDIR /usr/share/nginx/html
+WORKDIR /app
 
-COPY --from=frontend-build /app/.output /usr/share/nginx/html
+COPY --from=frontend-build /app/.output /app/.output
+
+RUN npm install -g serve
+
+EXPOSE 8080
 
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 8080
+ENV API_URL=http://your-backend-service:8080
 
 ENTRYPOINT ["/entrypoint.sh"]
