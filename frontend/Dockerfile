@@ -19,4 +19,4 @@ COPY --from=frontend-build /app /app
 
 EXPOSE 8080
 
-CMD ["pnpm", "run", "start"]
+CMD ["pnpm", "start"]
