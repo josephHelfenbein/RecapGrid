@@ -3,21 +3,18 @@ FROM node:18 AS frontend-build
 WORKDIR /app
 
 RUN npm install -g pnpm@8.15.4
-
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-COPY / ./
+COPY . ./
 RUN pnpm build
 
-FROM nginx:alpine
+FROM node:18 AS frontend-serve
 
-WORKDIR /usr/share/nginx/html
+WORKDIR /app
 
-COPY --from=frontend-build /app/.output/public /usr/share/nginx/html
-
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY --from=frontend-build /app /app
 
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["pnpm", "run", "start"]
