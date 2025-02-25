@@ -9,9 +9,11 @@ RUN pnpm install --frozen-lockfile
 COPY . ./
 RUN pnpm build
 
-FROM node:18 AS frontend-serve
+FROM node:18
 
 WORKDIR /app
+
+RUN npm install -g pnpm@8.15.4
 
 COPY --from=frontend-build /app /app
 
