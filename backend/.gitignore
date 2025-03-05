@@ -1,7 +1,7 @@
 target/*
 !target/*.jar
 
-src/main/resources/application.properties
+*.properties
 
 .mvn/
 .gradle/
