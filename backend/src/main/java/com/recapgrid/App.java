@@ -32,6 +32,9 @@ public class App {
 
     @PostMapping("/clerk-user")
     public String createClerkUser(@RequestBody ClerkUser clerkUser) {
+        if(clerkUser == null || clerkUser.getData() == null) {
+            return "ClerkUser data is missing";
+        }
         UserEntity entity = new UserEntity();
         entity.setId(clerkUser.getData().getId());
         entity.setFullName(clerkUser.getData().getFirstName() + " " + clerkUser.getData().getLastName());

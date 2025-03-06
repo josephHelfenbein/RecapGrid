@@ -1,7 +1,9 @@
 package com.recapgrid.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class ClerkUser {
+    @JsonProperty("data")
     private Data data;
 
     public Data getData() {

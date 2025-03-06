@@ -7,8 +7,6 @@ public class EmailAddress {
     private String emailAddress;
     
     private String id;
-    
-    private Verification verification;
 
     public String getEmailAddress() {
         return emailAddress;
@@ -22,12 +20,5 @@ public class EmailAddress {
     }
     public void setId(String id) {
         this.id = id;
-    }
-    
-    public Verification getVerification() {
-        return verification;
-    }
-    public void setVerification(Verification verification) {
-        this.verification = verification;
     }
 }
