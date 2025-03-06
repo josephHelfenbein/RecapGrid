@@ -76,6 +76,8 @@ public class App {
             }
         }
     }
+
+    @PostMapping("/delete-user")
     public ResponseEntity<String> deleteClerkUser(@RequestBody ClerkUser clerkUser){
         if(clerkUser == null || clerkUser.getData() == null) {
             return ResponseEntity.badRequest().body("Error: ClerkUser data is missing!");
