@@ -12,6 +12,12 @@
             <NuxtLink to="/dashboard">
                 <Button class="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
             </NuxtLink>
+              <SignedOut>
+                <SignInButton class="p-2" />
+              </SignedOut>
+              <SignedIn>
+                <UserButton />
+              </SignedIn>
             </div>
           </div>
         </nav>
