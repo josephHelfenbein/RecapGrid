@@ -36,7 +36,7 @@ public class App {
         entity.setId(clerkUser.getId());
         entity.setFullName(clerkUser.getFirstName() + " " + clerkUser.getLastName());
         entity.setProfilePicture(clerkUser.getImageUrl());
-        if(!clerkUser.getEmailAddresses().isEmpty()) {
+        if(clerkUser.getEmailAddresses()!=null && !clerkUser.getEmailAddresses().isEmpty()) {
             entity.setEmail(clerkUser.getEmailAddresses().get(0).getEmailAddress());
         } else {
             entity.setEmail(null);
