@@ -25,7 +25,6 @@ public class UserEntity {
     @Column(name = "email")
     private String email;
 
-    // Getters and Setters
     public String getId() {
         return id;
     }

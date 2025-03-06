@@ -33,11 +33,11 @@ public class App {
     @PostMapping("/clerk-user")
     public String createClerkUser(@RequestBody ClerkUser clerkUser) {
         UserEntity entity = new UserEntity();
-        entity.setId(clerkUser.getId());
-        entity.setFullName(clerkUser.getFirstName() + " " + clerkUser.getLastName());
-        entity.setProfilePicture(clerkUser.getImageUrl());
-        if(clerkUser.getEmailAddresses()!=null && !clerkUser.getEmailAddresses().isEmpty()) {
-            entity.setEmail(clerkUser.getEmailAddresses().get(0).getEmailAddress());
+        entity.setId(clerkUser.getData().getId());
+        entity.setFullName(clerkUser.getData().getFirstName() + " " + clerkUser.getData().getLastName());
+        entity.setProfilePicture(clerkUser.getData().getImageUrl());
+        if(clerkUser.getData().getEmailAddresses()!=null && !clerkUser.getData().getEmailAddresses().isEmpty()) {
+            entity.setEmail(clerkUser.getData().getEmailAddresses().get(0).getEmailAddress());
         } else {
             entity.setEmail(null);
         }
