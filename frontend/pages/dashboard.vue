@@ -150,7 +150,7 @@
   const backendUrl = config.public.apiBase;
 
   async function getVideos(userId){
-    const response = await fetch(`${backendUrl}/videos/${userId}`);
+    const response = await fetch(`${backendUrl}/api/videos/${userId}`);
     const data = await response.json();
     videos.value = data;
     console.log(data);
@@ -160,7 +160,7 @@
     formData.append('fileData', file);
     formData.append('fileName', file.name);
     formData.append('userId', user.value.id);
-    const response = await fetch(`${backendUrl}/videos/upload`, {
+    const response = await fetch(`${backendUrl}/api/videos/upload`, {
       method: 'POST',
       body: formData
     });
