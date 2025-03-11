@@ -146,8 +146,10 @@
   const { user } = useUser();
   const videos = ref([]);
 
+  const backendUrl = 'https://recapgrid-backend-378320393490.us-central1.run.app/api';
+
   async function getVideos(userId){
-    const response = await fetch(`${useRuntimeConfig().public.apiBase}/videos/${userId}`);
+    const response = await fetch(`${backendUrl}/videos/${userId}`);
     const data = await response.json();
     videos.value = data;
     console.log(data);
@@ -157,7 +159,7 @@
     formData.append('fileData', file);
     formData.append('fileName', file.name);
     formData.append('userId', user.value.id);
-    const response = await fetch(`${useRuntimeConfig().public.apiBase}/videos/upload`, {
+    const response = await fetch(`${backendUrl}/videos/upload`, {
       method: 'POST',
       body: formData
     });
