@@ -155,6 +155,19 @@
     videos.value = data;
     console.log(data);
   }
+  async function uploadVideo(file){
+    const formData = new FormData();
+    formData.append('fileData', file);
+    formData.append('fileName', file.name);
+    formData.append('userId', user.value.id);
+    const response = await fetch(`${backendUrl}/videos/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    videos.value.push(data);
+  }
+
   watch(() => user.value, async (newUser) => {
     if(newUser){
       await getVideos(newUser.id);

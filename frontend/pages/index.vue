@@ -9,14 +9,16 @@
             </div>
             <div>
             <ThemeToggle />
-            <NuxtLink to="/dashboard">
-                <Button class="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
-            </NuxtLink>
               <SignedOut>
-                <SignInButton class="p-2" />
+                <SignInButton />
               </SignedOut>
               <SignedIn>
-                <UserButton />
+                <div class="flex space-x-4">
+                  <NuxtLink to="/dashboard">
+                    <Button class="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
+                  </NuxtLink>
+                  <UserButton />
+                </div>
               </SignedIn>
             </div>
           </div>
