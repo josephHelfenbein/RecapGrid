@@ -144,13 +144,10 @@
 
   import { ref } from 'vue'
   const { user } = useUser();
- 
   const videos = ref([]);
-  const config = useRuntimeConfig();
-  const backendUrl = config.public.apiBase;
 
   async function getVideos(userId){
-    const response = await fetch(`${backendUrl}/api/videos/${userId}`);
+    const response = await fetch(`${useRuntimeConfig().public.apiBase}/videos/${userId}`);
     const data = await response.json();
     videos.value = data;
     console.log(data);
@@ -160,7 +157,7 @@
     formData.append('fileData', file);
     formData.append('fileName', file.name);
     formData.append('userId', user.value.id);
-    const response = await fetch(`${backendUrl}/api/videos/upload`, {
+    const response = await fetch(`${useRuntimeConfig().public.apiBase}/videos/upload`, {
       method: 'POST',
       body: formData
     });
