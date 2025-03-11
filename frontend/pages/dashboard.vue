@@ -141,4 +141,48 @@
     UploadCloudIcon,
     Wand2Icon
   } from 'lucide-vue-next'
+
+  import { supabase } from '../utils/supabase'
+  import { ref } from 'vue'
+  const { user } = useUser();
+ 
+  const videos = ref([]);
+
+  async function getVideos(userID) {
+    const { data, error } = await supabase
+      .from('videos')
+      .list(userID, {limit:1, offset:0});
+    if(error){
+      console.error(error);
+      return false;
+    }
+    if(data.length>0){
+      console.log(data);
+      videos.value = data.map((item)=>{
+        if(item.name==='dummy.txt'){
+          return null;
+        }
+        return item;
+      });
+    } else{
+      const { data, error } = await supabase.storage
+        .from('videos')
+        .upload(`${userID}/dummy.txt`, new Blob(['Dummy file content']),{
+          cacheControl: '3600',
+          upsert: true,
+        });
+      if(error){
+        console.error(error);
+        return false;
+      }
+      console.log('Folder created successfully');
+    }
+  }
+
+  watch(() => user.value, async (newUser) => {
+    if(newUser){
+      await getVideos(newUser.id);
+    }
+  });
+
   </script>
