@@ -159,7 +159,7 @@
     if(data.length>0){
       console.log(data);
       videos.value = data.map((item)=>{
-        if(item.name==='dummy.txt'){
+        if(item.name===`${userID}/dummy.txt`){
           return null;
         }
         return item;
