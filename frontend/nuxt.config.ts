@@ -5,23 +5,23 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_URL
-    }
+      apiBase: process.env.NUXT_PUBLIC_API_URL?.endsWith('/api/') ? process.env.NUXT_PUBLIC_API_URL : `${process.env.NUXT_PUBLIC_API_URL}/api`,
+    },
   },
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', 'shadcn-nuxt', '@clerk/nuxt'],
   nitro: {
-    devProxy: {
+    devProxy: process.env.NODE_ENV === 'development' ? {
       '/api/': {
         target: process.env.NUXT_PUBLIC_API_URL,
         changeOrigin: true,
         prependPath: false,
       }
-    }
+    } : undefined,
   },
   shadcn: {
     prefix: '',
-    componentDir: './components/ui'
+    componentDir: './components/ui',
   }
 });
