@@ -50,7 +50,11 @@
         <div class="container max-w-4xl py-6">
           <Card class="mb-6">
             <CardContent class="pt-6">
-              <div class="border-2 border-dashed rounded-lg p-8 text-center space-y-4">
+              <div 
+                class="border-2 border-dashed rounded-lg p-8 text-center space-y-4"
+                @dragover.prevent
+                @drop="handleDrop"
+              >
                 <div class="flex flex-col items-center gap-2">
                   <div class="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
                     <UploadCloudIcon class="h-6 w-6 text-primary" />
@@ -62,7 +66,14 @@
                     </p>
                   </div>
                 </div>
-                <Button variant="secondary">Select Video</Button>
+                <input
+                  type="file"
+                  accept="video/mp4,video/mov"
+                  class="hidden"
+                  ref="fileInput"
+                  @change="handleFileSelect"
+                />
+                <Button variant="secondary" @click="selectFile">Select Video</Button>
               </div>
             </CardContent>
           </Card>
@@ -147,6 +158,28 @@
   const videos = ref([]);
 
   const backendUrl = 'https://recapgrid-backend-378320393490.us-central1.run.app/api';
+
+  const fileInput = ref(null)
+
+  const selectFile = () => {
+    fileInput.value.click()
+  }
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+      uploadVideo(file)
+    }
+  }
+
+  const handleDrop = (event) => {
+    event.preventDefault()
+    const file = event.dataTransfer.files[0]
+    if (file) {
+      uploadVideo(file)
+    }
+  }
+
 
   async function getVideos(userId){
     const response = await fetch(`${backendUrl}/videos/${userId}`);
