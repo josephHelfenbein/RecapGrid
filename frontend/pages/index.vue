@@ -7,8 +7,8 @@
               <VideoIcon class="h-6 w-6 text-primary" />
               <span class="text-xl font-bold">RecapGrid</span>
             </div>
-            <div>
-            <ThemeToggle />
+            <div class="flex space-x-4">
+              <ThemeToggle />
               <SignedOut>
                 <SignInButton />
               </SignedOut>

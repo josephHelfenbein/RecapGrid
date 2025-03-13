@@ -12,6 +12,9 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', 'shadcn-nuxt', '@clerk/nuxt'],
   nitro: {
+    routeRules: {
+      '/api/**': { proxy: process.env.NUXT_PUBLIC_API_URL },
+    },
     devProxy: process.env.NODE_ENV === 'development' ? {
       '/api/': {
         target: process.env.NUXT_PUBLIC_API_URL,
