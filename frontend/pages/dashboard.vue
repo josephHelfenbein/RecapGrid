@@ -180,7 +180,7 @@
 
 
   async function getVideos(userId){
-    const response = await fetch(`/api/videos/${userId}`);
+    const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`);
     const data = await response.json();
     videos.value = data;
     console.log(data);
