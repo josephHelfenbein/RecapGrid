@@ -2,6 +2,8 @@ package com.recapgrid.controller;
 
 import com.recapgrid.model.Video;
 import com.recapgrid.repository.VideoRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
@@ -21,8 +23,9 @@ public class VideoController {
     @Value("${supabase.key}")
     private String supabaseKey;
 
-    private final VideoRepository videoRepository;
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private VideoRepository videoRepository;
+    private RestTemplate restTemplate = new RestTemplate();
 
     public VideoController(VideoRepository videoRepository) {
         this.videoRepository = videoRepository;
