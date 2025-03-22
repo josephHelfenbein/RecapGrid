@@ -68,7 +68,7 @@
                 </div>
                 <input
                   type="file"
-                  accept="video/mp4,video/mov"
+                  accept="video/mp4,video/quicktime"
                   class="hidden"
                   ref="fileInput"
                   @change="handleFileSelect"

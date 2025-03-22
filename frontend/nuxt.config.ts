@@ -2,7 +2,7 @@
 export default defineNuxtConfig({
   routeRules: {
     '/': { prerender: false },
-    '/api/**': { proxy: 'https://your-backend-api.com/**' },
+    '/api/**': { proxy: process.env.NUXT_PUBLIC_API_URL + '/**' },
   },
   runtimeConfig: {
     public: {
