@@ -1,6 +1,7 @@
 package com.recapgrid;
 
 import com.recapgrid.model.Video;
+import com.recapgrid.config.SupabaseConfig;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.UserEntity;
 import com.recapgrid.repository.VideoRepository;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -24,16 +26,17 @@ import java.util.Optional;
 
 @SpringBootApplication
 @RestController
+@EnableConfigurationProperties(SupabaseConfig.class)
 @RequestMapping("/api")
 public class App {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(App.class);
 
-    @Value("${supabase.url}")
-    private String supabaseUrl;
+    @Autowired
+    private SupabaseConfig supabaseConfig;
 
-    @Value("${supabase.key}")
-    private String supabaseKey;
+    private String supabaseUrl = supabaseConfig.getUrl();
+    private String supabaseKey = supabaseConfig.getKey();
 
     @Autowired
     private VideoRepository videoRepository;
