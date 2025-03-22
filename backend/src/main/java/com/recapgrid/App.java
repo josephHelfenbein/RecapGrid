@@ -127,7 +127,7 @@ public class App {
     }
     
     @PostMapping("/videos/upload")
-    public ResponseEntity<String> uploadVideo(
+    public ResponseEntity<Video> uploadVideo(
         @RequestParam("userId") String userId,
         @RequestParam("fileData") MultipartFile fileData,
         @RequestParam("fileName") String fileName) {
@@ -150,16 +150,17 @@ public class App {
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
-                videoRepository.save(new Video(userId, fileName, fileUrl));
+                Video saving = new Video(userId, fileName, fileUrl);
+                videoRepository.save(saving);
                 logger.info("Video uploaded successfully: {}", fileUrl);
-                return ResponseEntity.ok("Video uploaded successfully: " + fileUrl);
+                return ResponseEntity.ok(saving);
             } else {
                 logger.error("Error uploading video '{}', Status: {}, Response: {}", fileName, response.getStatusCode(), response.getBody());
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
         } catch (Exception e) {
             logger.error("Error uploading video '{}'", fileName, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
