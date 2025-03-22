@@ -6,6 +6,8 @@ import com.recapgrid.model.UserEntity;
 import com.recapgrid.repository.VideoRepository;
 import com.recapgrid.repository.UserRepository;
 import java.util.Collections;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -24,6 +26,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api")
 public class App {
+    
+    private static final Logger logger = LoggerFactory.getLogger(App.class);
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -49,6 +53,7 @@ public class App {
     }
 
     private void ensureUserFolderExists(String userId) {
+        logger.info("Ensuring folder exists for user: {}", userId);
         String folderPath = "videos/" + userId + "/dummy.txt";
         String checkUrl = supabaseUrl + "/storage/v1/object/public/" + folderPath;
 
@@ -58,6 +63,7 @@ public class App {
 
         ResponseEntity<String> response = restTemplate.exchange(checkUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
         if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
+            logger.info("Folder not found, creating: {}", folderPath);
             String uploadUrl = supabaseUrl + "/storage/v1/object/" + folderPath;
             HttpHeaders uploadHeaders = new HttpHeaders();
             uploadHeaders.set("apikey", supabaseKey);
@@ -73,18 +79,19 @@ public class App {
 
     @GetMapping("/videos")
     public ResponseEntity<List<Video>> getVideos(@RequestParam String userId) {
+        logger.info("Fetching videos for user: {}", userId);
         ensureUserFolderExists(userId);
-
         List<Video> videos = videoRepository.findByUserId(userId);
         if (videos == null) {
+            logger.info("No videos found for user: {}", userId);
             return ResponseEntity.ok(Collections.emptyList());
         }
-
         return ResponseEntity.ok(videos);
     }
 
     @PostMapping("/videos/upload")
     public ResponseEntity<String> uploadVideo(@RequestParam String userId, @RequestBody byte[] fileData, @RequestParam String fileName) {
+        logger.info("Uploading video '{}' for user: {}", fileName, userId);
         ensureUserFolderExists(userId);
 
         String storagePath = String.format("videos/%s/%s", userId, fileName);
@@ -103,33 +110,13 @@ public class App {
         if (response.getStatusCode() == HttpStatus.OK || response.getStatusCode() == HttpStatus.CREATED) {
             String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
             videoRepository.save(new Video(userId, fileName, fileUrl));
+            logger.info("Video uploaded successfully: {}", fileUrl);
             return ResponseEntity.ok("Video uploaded successfully: " + fileUrl);
         }
+        logger.error("Error uploading video '{}', status: {}", fileName, response.getStatusCode());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
     }
 
-    @DeleteMapping("/videos/delete")
-    public ResponseEntity<String> deleteVideo(@RequestParam Long videoId) {
-        Optional<Video> videoOpt = videoRepository.findById(videoId);
-        if (videoOpt.isPresent()) {
-            Video video = videoOpt.get();
-            String deleteUrl = String.format("%s/storage/v1/object/%s", supabaseUrl, video.getFileUrl().replace(supabaseUrl + "/storage/v1/object/public/", ""));
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("apikey", supabaseKey);
-            headers.set("Authorization", "Bearer " + supabaseKey);
-
-            HttpEntity<String> requestEntity = new HttpEntity<>(headers);
-            ResponseEntity<String> response = restTemplate.exchange(deleteUrl, HttpMethod.DELETE, requestEntity, String.class);
-
-            if (response.getStatusCode() == HttpStatus.NO_CONTENT || response.getStatusCode() == HttpStatus.OK) {
-                videoRepository.delete(video);
-                return ResponseEntity.ok("Video deleted successfully");
-            }
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error deleting video");
-        }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Video not found");
-    }
 
     @PostMapping("/clerk-user")
     public ResponseEntity<String> createClerkUser(@RequestBody ClerkUser clerkUser) {
