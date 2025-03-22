@@ -1,7 +1,7 @@
 package com.recapgrid;
 
 import com.recapgrid.model.Video;
-import com.recapgrid.config.SupabaseConfig;
+import com.recapgrid.Handler.CustomResponseErrorHandler;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.UserEntity;
 import com.recapgrid.repository.VideoRepository;
@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -26,17 +25,16 @@ import java.util.Optional;
 
 @SpringBootApplication
 @RestController
-@EnableConfigurationProperties(SupabaseConfig.class)
 @RequestMapping("/api")
 public class App {
 
     private static final Logger logger = LoggerFactory.getLogger(App.class);
 
-    @Autowired
-    private SupabaseConfig supabaseConfig;
+    @Value("${supabase.url}")
+    private String supabaseUrl;
 
-    private String supabaseUrl = supabaseConfig.getUrl();
-    private String supabaseKey = supabaseConfig.getKey();
+    @Value("${supabase.key}")
+    private String supabaseKey;
 
     @Autowired
     private VideoRepository videoRepository;
@@ -45,6 +43,10 @@ public class App {
     private UserRepository userRepository;
 
     private RestTemplate restTemplate = new RestTemplate();
+
+    public App() {
+        restTemplate.setErrorHandler(new CustomResponseErrorHandler());
+    }
 
     public static void main(String[] args) {
         SpringApplication.run(App.class, args);
