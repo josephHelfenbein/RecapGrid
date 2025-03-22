@@ -5,6 +5,7 @@ import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.UserEntity;
 import com.recapgrid.repository.VideoRepository;
 import com.recapgrid.repository.UserRepository;
+import java.util.Collections;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -73,7 +74,13 @@ public class App {
     @GetMapping("/videos")
     public ResponseEntity<List<Video>> getVideos(@RequestParam String userId) {
         ensureUserFolderExists(userId);
-        return ResponseEntity.ok(videoRepository.findByUserId(userId));
+
+        List<Video> videos = videoRepository.findByUserId(userId);
+        if (videos == null) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        return ResponseEntity.ok(videos);
     }
 
     @PostMapping("/videos/upload")
