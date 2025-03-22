@@ -51,23 +51,25 @@ public class App {
     public String healthCheck() {
         return "Backend is running!";
     }
-
     private void ensureUserFolderExists(String userId) {
         logger.info("Ensuring folder exists for user: {}", userId);
         String folderPath = "videos/" + userId;
-    
+
         String listUrl = supabaseUrl + "/storage/v1/object/list/" + folderPath;
         HttpHeaders headers = createHeaders();
     
         ResponseEntity<String> response = restTemplate.exchange(listUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-    
+
         if (response.getStatusCode() == HttpStatus.OK) {
-            if (response.getBody() == null || response.getBody()==null || response.getBody().isEmpty()) {
+            if (response.getBody() == null || response.getBody().isEmpty()) {
                 logger.info("Folder exists but is empty, creating dummy file.");
                 createDummyFile(folderPath);
             } else {
                 logger.info("Folder already exists for user: {}", userId);
             }
+        } else if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
+            logger.info("Folder not found, creating folder for user: {}", userId);
+            createDummyFile(folderPath);
         } else {
             logger.error("Error checking folder: {} - Status: {}", folderPath, response.getStatusCode());
         }
@@ -75,20 +77,23 @@ public class App {
     
     private void createDummyFile(String folderPath) {
         String uploadUrl = supabaseUrl + "/storage/v1/object/" + folderPath + "/dummy.txt";
-        HttpHeaders uploadHeaders = createHeaders();
+        
+        HttpHeaders uploadHeaders = new HttpHeaders();
+        uploadHeaders.set("apikey", supabaseKey);
         uploadHeaders.set("Content-Type", "text/plain");
-    
+        
         ByteArrayResource resource = new ByteArrayResource("Dummy file content".getBytes());
         HttpEntity<ByteArrayResource> uploadEntity = new HttpEntity<>(resource, uploadHeaders);
-    
+        
         ResponseEntity<String> uploadResponse = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
-    
-        if (uploadResponse.getStatusCode() != HttpStatus.OK && uploadResponse.getStatusCode() != HttpStatus.CREATED) {
-            logger.error("Error creating dummy file for folder: {}", uploadResponse.getStatusCode());
+        
+        if (uploadResponse.getStatusCode() == HttpStatus.OK || uploadResponse.getStatusCode() == HttpStatus.CREATED) {
+            logger.info("Dummy file created successfully to ensure folder exists");
         } else {
-            logger.info("Dummy file created successfully to ensure folder exists.");
+            logger.error("Error creating dummy file for folder: {}", uploadResponse.getStatusCode());
         }
     }
+    
     
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
