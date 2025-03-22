@@ -183,7 +183,7 @@
 
   const uploadVideo = async (file) => {
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("fileData", file);
     formData.append("fileName", file.name);
     formData.append("userId", user.value.id);
 

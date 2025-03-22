@@ -17,6 +17,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -126,23 +127,28 @@ public class App {
     }
     
     @PostMapping("/videos/upload")
-    public ResponseEntity<String> uploadVideo(@RequestParam String userId, @RequestBody byte[] fileData, @RequestParam String fileName) {
+    public ResponseEntity<String> uploadVideo(
+        @RequestParam("userId") String userId,
+        @RequestParam("fileData") MultipartFile fileData,
+        @RequestParam("fileName") String fileName) {
+        
         logger.info("Uploading video '{}' for user: {}", fileName, userId);
         ensureUserFolderExists(userId);
-    
+
         String storagePath = "videos/" + userId + "/" + fileName;
         String uploadUrl = supabaseUrl + "/storage/v1/object/" + storagePath;
-    
+
         HttpHeaders headers = createHeaders();
-        headers.set("Content-Type", "video/mp4");
-    
-        ByteArrayResource resource = new ByteArrayResource(fileData);
-        HttpEntity<ByteArrayResource> uploadEntity = new HttpEntity<>(resource, headers);
-    
+        headers.set("Content-Type", fileData.getContentType());
+
+        HttpEntity<ByteArrayResource> uploadEntity;
         try {
+            ByteArrayResource resource = new ByteArrayResource(fileData.getBytes());
+            uploadEntity = new HttpEntity<>(resource, headers);
+
             ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
-    
-            if (response.getStatusCode() == HttpStatus.OK || response.getStatusCode() == HttpStatus.CREATED) {
+
+            if (response.getStatusCode().is2xxSuccessful()) {
                 String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
                 videoRepository.save(new Video(userId, fileName, fileUrl));
                 logger.info("Video uploaded successfully: {}", fileUrl);
@@ -156,6 +162,7 @@ public class App {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
         }
     }
+
     
 
 
