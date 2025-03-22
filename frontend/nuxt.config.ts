@@ -2,11 +2,11 @@
 export default defineNuxtConfig({
   routeRules: {
     '/': { prerender: false },
-    '/api/**': { proxy: process.env.NUXT_PUBLIC_API_URL + '/**' },
+    "/api/**": { proxy: "https://recapgrid-backend-378320393490.us-central1.run.app/api/**" },
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_URL,
+      apiBase: "https://recapgrid-backend-378320393490.us-central1.run.app",
     },
   },
   compatibilityDate: '2024-11-01',
