@@ -84,6 +84,8 @@ public class App {
     
         HttpHeaders uploadHeaders = new HttpHeaders();
         uploadHeaders.set("apikey", supabaseKey);
+        uploadHeaders.set("Authorization", "Bearer " + supabaseKey);
+    
         uploadHeaders.set("Content-Type", "text/plain");
     
         ByteArrayResource resource = new ByteArrayResource("Dummy file content".getBytes());
@@ -107,6 +109,7 @@ public class App {
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", supabaseKey);
+        headers.set("Authorization", "Bearer " + supabaseKey);
         return headers;
     }
     
