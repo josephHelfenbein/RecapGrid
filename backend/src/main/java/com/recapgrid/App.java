@@ -2,8 +2,10 @@ package com.recapgrid;
 
 import com.recapgrid.model.Video;
 import com.recapgrid.model.ClerkUser;
+import com.recapgrid.model.Processed;
 import com.recapgrid.model.UserEntity;
 import com.recapgrid.repository.VideoRepository;
+import com.recapgrid.repository.ProcessedRepository;
 import com.recapgrid.repository.UserRepository;
 import java.util.Collections;
 import org.slf4j.Logger;
@@ -42,6 +44,9 @@ public class App {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ProcessedRepository processedRepository;
+
     private RestTemplate restTemplate = new RestTemplate();
 
     public static void main(String[] args) {
@@ -52,9 +57,9 @@ public class App {
     public String healthCheck() {
         return "Backend is running!";
     }
-    private void ensureUserFolderExists(String userId) {
+    private void ensureUserFolderExists(String userId, String folder) {
         logger.info("Ensuring folder exists for user: {}", userId);
-        String folderPath = "videos/" + userId;
+        String folderPath = folder + "/" + userId;
         
         String listUrl = supabaseUrl + "/storage/v1/object/list/" + folderPath;
         HttpHeaders headers = createHeaders();
@@ -83,9 +88,7 @@ public class App {
     private void createDummyFile(String folderPath) {
         String uploadUrl = supabaseUrl + "/storage/v1/object/" + folderPath + "/dummy.txt";
     
-        HttpHeaders uploadHeaders = new HttpHeaders();
-        uploadHeaders.set("apikey", supabaseKey);
-        uploadHeaders.set("Authorization", "Bearer " + supabaseKey);
+        HttpHeaders uploadHeaders = createHeaders();
     
         uploadHeaders.set("Content-Type", "text/plain");
     
@@ -105,8 +108,7 @@ public class App {
             logger.error("Error uploading dummy file to folder: {}", folderPath, e);
         }
     }
-    
-    
+      
     private HttpHeaders createHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", supabaseKey);
@@ -117,8 +119,20 @@ public class App {
     @GetMapping("/videos")
     public ResponseEntity<List<Video>> getVideos(@RequestParam String userId) {
         logger.info("Fetching videos for user: {}", userId);
-        ensureUserFolderExists(userId);
+        ensureUserFolderExists(userId, "videos");
         List<Video> videos = videoRepository.findByUserId(userId);
+        if (videos == null || videos.isEmpty()) {
+            logger.info("No videos found for user: {}", userId);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        return ResponseEntity.ok(videos);
+    }
+
+    @GetMapping("/processed")
+    public ResponseEntity<List<Processed>> getProcessed(@RequestParam String userId) {
+        logger.info("Fetching processed videos for user: {}", userId);
+        ensureUserFolderExists(userId, "processed");
+        List<Processed> videos = processedRepository.findByUserId(userId);
         if (videos == null || videos.isEmpty()) {
             logger.info("No videos found for user: {}", userId);
             return ResponseEntity.ok(Collections.emptyList());
@@ -133,7 +147,7 @@ public class App {
         @RequestParam("fileName") String fileName) {
         
         logger.info("Uploading video '{}' for user: {}", fileName, userId);
-        ensureUserFolderExists(userId);
+        ensureUserFolderExists(userId, "videos");
 
         String storagePath = "videos/" + userId + "/" + fileName;
         String uploadUrl = supabaseUrl + "/storage/v1/object/" + storagePath;
@@ -163,9 +177,6 @@ public class App {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
-
-    
-
 
     @PostMapping("/clerk-user")
     public ResponseEntity<String> createClerkUser(@RequestBody ClerkUser clerkUser) {

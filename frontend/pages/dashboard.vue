@@ -1,52 +1,25 @@
 <template>
     <div class="h-screen bg-background flex">
-      <aside class="hidden lg:flex w-64 flex-col border-r bg-muted/40">
-        <div class="flex h-14 items-center border-b px-4 lg:h-[60px]">
-          <div class="flex items-center gap-2 font-semibold">
-            <VideoIcon class="h-6 w-6 text-primary" />
-            <span>RecapGrid</span>
-          </div>
-        </div>
-        <nav class="flex-1 space-y-1 p-2">
-          <Button variant="ghost" class="w-full justify-start gap-2">
-            <LayoutDashboardIcon class="h-4 w-4" />
-            Dashboard
-          </Button>
-          <Button variant="secondary" class="w-full justify-start gap-2">
-            <PlusIcon class="h-4 w-4" />
-            New Video
-          </Button>
-          <Button variant="ghost" class="w-full justify-start gap-2">
-            <FolderIcon class="h-4 w-4" />
-            My Videos
-          </Button>
-          <Button variant="ghost" class="w-full justify-start gap-2">
-            <SettingsIcon class="h-4 w-4" />
-            Settings
-          </Button>
-        </nav>
-        <div class="border-t p-4">
-          <div class="flex items-center gap-2">
-            <Avatar>
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>JD</AvatarFallback>
-            </Avatar>
-            <div class="flex flex-col">
-              <span class="text-sm font-medium">John Doe</span>
-              <span class="text-xs text-muted-foreground">john@example.com</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-  
       <main class="flex-1 overflow-auto">
         <div class="h-14 border-b flex items-center justify-between px-4 lg:h-[60px]">
-          <h1 class="font-semibold">New Video</h1>
-          <Button variant="ghost" size="icon">
-            <BellIcon class="h-4 w-4" />
-          </Button>
+          <h1 class="font-semibold">RecapGrid</h1>
+          <div class="flex space-x-4">
+              <ThemeToggle />
+              <SignedOut>
+                <SignInButton />
+              </SignedOut>
+              <SignedIn>
+                <div class="flex space-x-4">
+                  <NuxtLink to="/dashboard">
+                    <Button class="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
+                  </NuxtLink>
+                  <UserButton />
+                </div>
+              </SignedIn>
+            </div>
         </div>
-  
+        
+        <div class="w-screen flex justify-center">
         <div class="container max-w-4xl py-6">
           <Card class="mb-6">
             <CardContent class="pt-6">
@@ -77,65 +50,41 @@
               </div>
             </CardContent>
           </Card>
-  
-          <div class="grid gap-6">
-            <Card>
+
+          <h3 class="text-lg text-center font-semibold">Pending Videos</h3>
+          <div v-if="pendingVideos.length>0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
+            <Card v-for="video in pendingVideos" :key="video.id">
               <CardHeader>
-                <CardTitle>Video Settings</CardTitle>
-                <CardDescription>Configure how your video will be processed</CardDescription>
-              </CardHeader>
-              <CardContent class="space-y-4">
-                <div class="space-y-2">
-                  <Label>Title</Label>
-                  <Input placeholder="Enter video title" />
-                </div>
-                
-                <div class="space-y-2">
-                  <Label>Platform</Label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select platform" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tiktok">TikTok</SelectItem>
-                      <SelectItem value="instagram">Instagram Reels</SelectItem>
-                      <SelectItem value="youtube">YouTube Shorts</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-  
-                <div class="space-y-2">
-                  <Label>AI Features</Label>
-                  <div class="grid gap-2">
-                    <div class="flex items-center space-x-2">
-                      <Checkbox id="captions" />
-                      <label for="captions" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Auto-generate captions
-                      </label>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                      <Checkbox id="music" />
-                      <label for="music" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Add AI background music
-                      </label>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                      <Checkbox id="voice" />
-                      <label for="voice" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Enhance voice audio
-                      </label>
-                    </div>
+                <video class="w-full h-36 object-cover rounded-lg" :src="video.fileUrl" controls></video>
+                <div class="flex items-center justify-between mt-4">
+                  <div>
+                    <CardTitle>{{ video.fileName }}</CardTitle>
+                    <p class="text-foreground text-xs">Uploaded on {{ new Date(video.uploadedAt).toLocaleDateString() }}</p>
                   </div>
+                  <Button variant="secondary" size="sm">Process</Button>
                 </div>
-              </CardContent>
-              <CardFooter>
-                <Button class="ml-auto">
-                  <Wand2Icon class="mr-2 h-4 w-4" />
-                  Process Video
-                </Button>
-              </CardFooter>
+              </CardHeader>
             </Card>
           </div>
+          <div v-else class="text-foreground text-center py-6">No videos uploaded yet. Drop a video above to get started.</div>
+
+          <h3 class="text-lg text-center font-semibold">Processed Videos</h3>
+          <div v-if="videos.length>0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
+            <Card v-for="video in videos" :key="video.id">
+              <CardHeader>
+                <video class="w-full h-36 object-cover rounded-lg" :src="video.fileUrl" controls></video>
+                <div class="flex items-center justify-between mt-4">
+                  <div>
+                    <CardTitle>{{ video.fileName }}</CardTitle>
+                    <p class="text-foreground text-xs">Processed on {{ new Date(video.uploadedAt).toLocaleDateString() }}</p>
+                  </div>
+                  <Button variant="secondary" size="sm">Download</Button>
+                </div>
+              </CardHeader>
+            </Card>
+          </div>
+          <div v-else class="text-foreground text-center py-6">No videos processed yet.</div>
+        </div>
         </div>
       </main>
     </div>
@@ -156,13 +105,20 @@
   import { ref } from 'vue'
   const { user } = useUser();
   const videos = ref([]);
+  const pendingVideos = ref([]);
 
   const fileInput = ref(null)
 
   async function getVideos(userId){
-    const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`);
+    const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`);
     const data = await response.json();
     videos.value = data;
+    console.log(data);
+  }
+  async function getPending(userId){
+    const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`);
+    const data = await response.json();
+    pendingVideos.value = data;
     console.log(data);
   }
 
@@ -207,6 +163,7 @@
   watch(() => user.value, async (newUser) => {
     if(newUser){
       await getVideos(newUser.id);
+      await getPending(newUser.id);
     }
   });
 
