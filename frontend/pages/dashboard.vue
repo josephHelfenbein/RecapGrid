@@ -159,44 +159,50 @@
 
   const fileInput = ref(null)
 
-  const selectFile = () => {
-    fileInput.value.click()
-  }
-
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0]
-    if (file) {
-      uploadVideo(file)
-    }
-  }
-
-  const handleDrop = (event) => {
-    event.preventDefault()
-    const file = event.dataTransfer.files[0]
-    if (file) {
-      uploadVideo(file)
-    }
-  }
-
-
   async function getVideos(userId){
     const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`);
     const data = await response.json();
     videos.value = data;
     console.log(data);
   }
-  async function uploadVideo(file){
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file) uploadVideo(file);
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) uploadVideo(file);
+  };
+
+  const selectFile = () => {
+    fileInput.value.click();
+  };
+
+  const uploadVideo = async (file) => {
     const formData = new FormData();
-    formData.append('fileData', file);
-    formData.append('fileName', file.name);
-    formData.append('userId', user.value.id);
-    const response = await fetch(`/api/videos/upload`, {
-      method: 'POST',
-      body: formData
-    });
-    const data = await response.json();
-    videos.value.push(data);
-  }
+    formData.append("file", file);
+    formData.append("fileName", file.name);
+    formData.append("userId", user.value.id);
+
+    try {
+      const response = await fetch("/api/videos/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      videos.value.push(data);
+    } catch (error) {
+      console.error("Error uploading video:", error);
+    }
+  };
 
   watch(() => user.value, async (newUser) => {
     if(newUser){

@@ -130,27 +130,33 @@ public class App {
         logger.info("Uploading video '{}' for user: {}", fileName, userId);
         ensureUserFolderExists(userId);
     
-        String storagePath = String.format("videos/%s/%s", userId, fileName);
-        String uploadUrl = String.format("%s/storage/v1/object/%s", supabaseUrl, storagePath);
+        String storagePath = "videos/" + userId + "/" + fileName;
+        String uploadUrl = supabaseUrl + "/storage/v1/object/" + storagePath;
     
         HttpHeaders headers = createHeaders();
         headers.set("Content-Type", "video/mp4");
     
         ByteArrayResource resource = new ByteArrayResource(fileData);
-        HttpEntity<ByteArrayResource> requestEntity = new HttpEntity<>(resource, headers);
+        HttpEntity<ByteArrayResource> uploadEntity = new HttpEntity<>(resource, headers);
     
-        ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, requestEntity, String.class);
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
     
-        if (response.getStatusCode() == HttpStatus.OK || response.getStatusCode() == HttpStatus.CREATED) {
-            String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
-            videoRepository.save(new Video(userId, fileName, fileUrl));
-            logger.info("Video uploaded successfully: {}", fileUrl);
-            return ResponseEntity.ok("Video uploaded successfully: " + fileUrl);
-        } else {
-            logger.error("Error uploading video '{}', status: {}, response: {}", fileName, response.getStatusCode(), response.getBody());
+            if (response.getStatusCode() == HttpStatus.OK || response.getStatusCode() == HttpStatus.CREATED) {
+                String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
+                videoRepository.save(new Video(userId, fileName, fileUrl));
+                logger.info("Video uploaded successfully: {}", fileUrl);
+                return ResponseEntity.ok("Video uploaded successfully: " + fileUrl);
+            } else {
+                logger.error("Error uploading video '{}', Status: {}, Response: {}", fileName, response.getStatusCode(), response.getBody());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
+            }
+        } catch (Exception e) {
+            logger.error("Error uploading video '{}'", fileName, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
         }
-    }    
+    }
+    
 
 
     @PostMapping("/clerk-user")
