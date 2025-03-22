@@ -54,29 +54,34 @@ public class App {
     private void ensureUserFolderExists(String userId) {
         logger.info("Ensuring folder exists for user: {}", userId);
         String folderPath = "videos/" + userId;
-
+        
         String listUrl = supabaseUrl + "/storage/v1/object/list/" + folderPath;
         HttpHeaders headers = createHeaders();
-    
-        ResponseEntity<String> response = restTemplate.exchange(listUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-
-        if (response.getStatusCode() == HttpStatus.OK) {
-            if (response.getBody() == null || response.getBody().isEmpty()) {
-                logger.info("Folder exists but is empty, creating dummy file.");
+        
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(listUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+            
+            if (response.getStatusCode() == HttpStatus.OK) {
+                if (response.getBody() == null || response.getBody().isEmpty()) {
+                    logger.info("Folder exists but is empty, creating dummy file.");
+                    createDummyFile(folderPath);
+                } else {
+                    logger.info("Folder already exists for user: {}", userId);
+                }
+            } else if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
+                logger.info("Folder not found, creating folder for user: {}", userId);
                 createDummyFile(folderPath);
             } else {
-                logger.info("Folder already exists for user: {}", userId);
+                logger.error("Error checking folder: {} - Status: {}", folderPath, response.getStatusCode());
             }
-        } else if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
-            logger.info("Folder not found, creating folder for user: {}", userId);
+        } catch (Exception e) {
+            logger.error("An error occurred while checking the folder: {}", folderPath, e);
             createDummyFile(folderPath);
-        } else {
-            logger.error("Error checking folder: {} - Status: {}", folderPath, response.getStatusCode());
         }
     }
     
     private void createDummyFile(String folderPath) {
-        String uploadUrl = supabaseUrl + "/storage/v1/object/" + folderPath + "/dummy.txt";
+        String uploadUrl = supabaseUrl + "/storage/v1/object/videos/" + folderPath + "/dummy.txt";
         
         HttpHeaders uploadHeaders = new HttpHeaders();
         uploadHeaders.set("apikey", supabaseKey);
@@ -85,14 +90,19 @@ public class App {
         ByteArrayResource resource = new ByteArrayResource("Dummy file content".getBytes());
         HttpEntity<ByteArrayResource> uploadEntity = new HttpEntity<>(resource, uploadHeaders);
         
-        ResponseEntity<String> uploadResponse = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
-        
-        if (uploadResponse.getStatusCode() == HttpStatus.OK || uploadResponse.getStatusCode() == HttpStatus.CREATED) {
-            logger.info("Dummy file created successfully to ensure folder exists");
-        } else {
-            logger.error("Error creating dummy file for folder: {}", uploadResponse.getStatusCode());
+        try {
+            ResponseEntity<String> uploadResponse = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
+            
+            if (uploadResponse.getStatusCode() == HttpStatus.OK || uploadResponse.getStatusCode() == HttpStatus.CREATED) {
+                logger.info("Dummy file created successfully to ensure folder exists");
+            } else {
+                logger.error("Error creating dummy file for folder: {}, Status: {}", folderPath, uploadResponse.getStatusCode());
+            }
+        } catch (Exception e) {
+            logger.error("Error uploading dummy file to folder: {}", folderPath, e);
         }
     }
+    
     
     
     private HttpHeaders createHeaders() {
