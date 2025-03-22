@@ -1,7 +1,6 @@
 package com.recapgrid;
 
 import com.recapgrid.model.Video;
-import com.recapgrid.Handler.CustomResponseErrorHandler;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.UserEntity;
 import com.recapgrid.repository.VideoRepository;
@@ -44,10 +43,6 @@ public class App {
 
     private RestTemplate restTemplate = new RestTemplate();
 
-    public App() {
-        restTemplate.setErrorHandler(new CustomResponseErrorHandler());
-    }
-
     public static void main(String[] args) {
         SpringApplication.run(App.class, args);
     }
@@ -59,68 +54,86 @@ public class App {
 
     private void ensureUserFolderExists(String userId) {
         logger.info("Ensuring folder exists for user: {}", userId);
-        String folderPath = "videos/" + userId + "/dummy.txt";
-        String checkUrl = supabaseUrl + "/storage/v1/object/public/" + folderPath;
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("apikey", supabaseKey);
-        headers.set("Authorization", "Bearer " + supabaseKey);
-
-        ResponseEntity<String> response = restTemplate.exchange(checkUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-        if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
-            logger.info("Folder not found, creating: {}", folderPath);
-            String uploadUrl = supabaseUrl + "/storage/v1/object/" + folderPath;
-            HttpHeaders uploadHeaders = new HttpHeaders();
-            uploadHeaders.set("apikey", supabaseKey);
-            uploadHeaders.set("Authorization", "Bearer " + supabaseKey);
-            uploadHeaders.set("Content-Type", "text/plain");
-
-            ByteArrayResource resource = new ByteArrayResource("Dummy file content".getBytes());
-            HttpEntity<ByteArrayResource> uploadEntity = new HttpEntity<>(resource, uploadHeaders);
-
-            restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
+        String folderPath = "videos/" + userId;
+    
+        String listUrl = supabaseUrl + "/storage/v1/object/list/" + folderPath;
+        HttpHeaders headers = createHeaders();
+    
+        ResponseEntity<String> response = restTemplate.exchange(listUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+    
+        if (response.getStatusCode() == HttpStatus.OK) {
+            if (response.getBody() == null || response.getBody()==null || response.getBody().isEmpty()) {
+                logger.info("Folder exists but is empty, creating dummy file.");
+                createDummyFile(folderPath);
+            } else {
+                logger.info("Folder already exists for user: {}", userId);
+            }
+        } else {
+            logger.error("Error checking folder: {} - Status: {}", folderPath, response.getStatusCode());
         }
     }
-
+    
+    private void createDummyFile(String folderPath) {
+        String uploadUrl = supabaseUrl + "/storage/v1/object/" + folderPath + "/dummy.txt";
+        HttpHeaders uploadHeaders = createHeaders();
+        uploadHeaders.set("Content-Type", "text/plain");
+    
+        ByteArrayResource resource = new ByteArrayResource("Dummy file content".getBytes());
+        HttpEntity<ByteArrayResource> uploadEntity = new HttpEntity<>(resource, uploadHeaders);
+    
+        ResponseEntity<String> uploadResponse = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
+    
+        if (uploadResponse.getStatusCode() != HttpStatus.OK && uploadResponse.getStatusCode() != HttpStatus.CREATED) {
+            logger.error("Error creating dummy file for folder: {}", uploadResponse.getStatusCode());
+        } else {
+            logger.info("Dummy file created successfully to ensure folder exists.");
+        }
+    }
+    
+    private HttpHeaders createHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("apikey", supabaseKey);
+        return headers;
+    }
+    
     @GetMapping("/videos")
     public ResponseEntity<List<Video>> getVideos(@RequestParam String userId) {
         logger.info("Fetching videos for user: {}", userId);
         ensureUserFolderExists(userId);
         List<Video> videos = videoRepository.findByUserId(userId);
-        if (videos == null) {
+        if (videos == null || videos.isEmpty()) {
             logger.info("No videos found for user: {}", userId);
             return ResponseEntity.ok(Collections.emptyList());
         }
         return ResponseEntity.ok(videos);
     }
-
+    
     @PostMapping("/videos/upload")
     public ResponseEntity<String> uploadVideo(@RequestParam String userId, @RequestBody byte[] fileData, @RequestParam String fileName) {
         logger.info("Uploading video '{}' for user: {}", fileName, userId);
         ensureUserFolderExists(userId);
-
+    
         String storagePath = String.format("videos/%s/%s", userId, fileName);
         String uploadUrl = String.format("%s/storage/v1/object/%s", supabaseUrl, storagePath);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("apikey", supabaseKey);
-        headers.set("Authorization", "Bearer " + supabaseKey);
+    
+        HttpHeaders headers = createHeaders();
         headers.set("Content-Type", "video/mp4");
-
+    
         ByteArrayResource resource = new ByteArrayResource(fileData);
         HttpEntity<ByteArrayResource> requestEntity = new HttpEntity<>(resource, headers);
-
+    
         ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, requestEntity, String.class);
-
+    
         if (response.getStatusCode() == HttpStatus.OK || response.getStatusCode() == HttpStatus.CREATED) {
             String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
             videoRepository.save(new Video(userId, fileName, fileUrl));
             logger.info("Video uploaded successfully: {}", fileUrl);
             return ResponseEntity.ok("Video uploaded successfully: " + fileUrl);
+        } else {
+            logger.error("Error uploading video '{}', status: {}, response: {}", fileName, response.getStatusCode(), response.getBody());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
         }
-        logger.error("Error uploading video '{}', status: {}", fileName, response.getStatusCode());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error uploading video");
-    }
+    }    
 
 
     @PostMapping("/clerk-user")
