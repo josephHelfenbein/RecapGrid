@@ -79,30 +79,29 @@ public class App {
             createDummyFile(folderPath);
         }
     }
-    
     private void createDummyFile(String folderPath) {
-        String uploadUrl = supabaseUrl + "/storage/v1/object/videos/" + folderPath + "/dummy.txt";
-        
+        String uploadUrl = supabaseUrl + "/storage/v1/object/" + folderPath + "/dummy.txt";
+    
         HttpHeaders uploadHeaders = new HttpHeaders();
         uploadHeaders.set("apikey", supabaseKey);
         uploadHeaders.set("Content-Type", "text/plain");
-        
+    
         ByteArrayResource resource = new ByteArrayResource("Dummy file content".getBytes());
         HttpEntity<ByteArrayResource> uploadEntity = new HttpEntity<>(resource, uploadHeaders);
-        
+    
         try {
             ResponseEntity<String> uploadResponse = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
-            
+    
             if (uploadResponse.getStatusCode() == HttpStatus.OK || uploadResponse.getStatusCode() == HttpStatus.CREATED) {
                 logger.info("Dummy file created successfully to ensure folder exists");
             } else {
-                logger.error("Error creating dummy file for folder: {}, Status: {}", folderPath, uploadResponse.getStatusCode());
+                logger.error("Error creating dummy file for folder: {}, Status: {}, Response Body: {}", 
+                              folderPath, uploadResponse.getStatusCode(), uploadResponse.getBody());
             }
         } catch (Exception e) {
             logger.error("Error uploading dummy file to folder: {}", folderPath, e);
         }
     }
-    
     
     
     private HttpHeaders createHeaders() {
