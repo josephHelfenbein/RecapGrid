@@ -154,7 +154,7 @@
       }
 
       const data = await response.json();
-      videos.value.push(data);
+      pendingVideos.value.push(data);
     } catch (error) {
       console.error("Error uploading video:", error);
     }

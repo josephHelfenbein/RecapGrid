@@ -20,7 +20,9 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -149,7 +151,8 @@ public class App {
         logger.info("Uploading video '{}' for user: {}", fileName, userId);
         ensureUserFolderExists(userId, "videos");
 
-        String storagePath = "videos/" + userId + "/" + fileName;
+        String encodedFileName = UriUtils.encodePath(fileName, StandardCharsets.UTF_8);
+        String storagePath = "videos/" + userId + "/" + encodedFileName;
         String uploadUrl = supabaseUrl + "/storage/v1/object/" + storagePath;
 
         HttpHeaders headers = createHeaders();
