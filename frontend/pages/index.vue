@@ -1,30 +1,5 @@
 <template>
-    <div class="min-h-screen bg-background">
-      <header class="fixed top-0 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <nav class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex h-16 items-center justify-between">
-            <div class="flex items-center gap-2">
-              <VideoIcon class="h-6 w-6 text-primary" />
-              <span class="text-xl font-bold">RecapGrid</span>
-            </div>
-            <div class="flex space-x-4">
-              <ThemeToggle />
-              <SignedOut>
-                <SignInButton />
-              </SignedOut>
-              <SignedIn>
-                <div class="flex space-x-4">
-                  <NuxtLink to="/dashboard">
-                    <Button class="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
-                  </NuxtLink>
-                  <UserButton />
-                </div>
-              </SignedIn>
-            </div>
-          </div>
-        </nav>
-      </header>
-  
+    <div class="min-h-screen bg-background pt-20">
       <main class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
         <section class="pt-32 pb-20">
           <div class="flex flex-col items-center text-center gap-6">
@@ -113,8 +88,7 @@
   
   <script setup>
   import { 
-    VideoIcon, 
-    PlayCircleIcon,
+    VideoIcon,
     WandIcon,
     TypeIcon,
     MusicIcon,

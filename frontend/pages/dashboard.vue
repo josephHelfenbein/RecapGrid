@@ -1,24 +1,6 @@
 <template>
-    <div class="h-screen bg-background flex">
+    <div class="h-screen bg-background flex pt-20">
       <main class="flex-1 overflow-auto">
-        <div class="h-14 border-b flex items-center justify-between px-4 lg:h-[60px]">
-          <h1 class="font-semibold">RecapGrid</h1>
-          <div class="flex space-x-4">
-              <ThemeToggle />
-              <SignedOut>
-                <SignInButton />
-              </SignedOut>
-              <SignedIn>
-                <div class="flex space-x-4">
-                  <NuxtLink to="/dashboard">
-                    <Button class="bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
-                  </NuxtLink>
-                  <UserButton />
-                </div>
-              </SignedIn>
-            </div>
-        </div>
-        
         <div class="w-screen flex justify-center">
         <div class="container max-w-4xl py-6">
           <Card class="mb-6">
@@ -52,7 +34,10 @@
           </Card>
 
           <h3 class="text-lg text-center font-semibold">Pending Videos</h3>
-          <div v-if="pendingVideos.length>0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
+          <div v-if="!loadedPending" class="flex items-center justify-center py-6">
+            <Loader size="40px" />
+          </div>
+          <div v-else-if="pendingVideos.length>0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
             <Card v-for="video in pendingVideos" :key="video.id">
               <CardHeader>
                 <video class="w-full h-36 object-cover rounded-lg" :src="video.fileUrl" controls></video>
@@ -61,15 +46,19 @@
                     <CardTitle>{{ video.fileName }}</CardTitle>
                     <p class="text-foreground text-xs">Uploaded on {{ new Date(video.uploadedAt).toLocaleDateString() }}</p>
                   </div>
-                  <Button variant="secondary" size="sm">Process</Button>
+                  <Button variant="secondary" size="sm" @click="processVideo(video)">Process</Button>
                 </div>
               </CardHeader>
             </Card>
           </div>
           <div v-else class="text-foreground text-center py-6">No videos uploaded yet. Drop a video above to get started.</div>
+          <ProcessWindow ref="videoPopup" @submit="handleProcessing" />
 
           <h3 class="text-lg text-center font-semibold">Processed Videos</h3>
-          <div v-if="videos.length>0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
+          <div v-if="!loadedVideos" class="flex items-center justify-center py-6">
+            <Loader size="40px" />
+          </div>
+          <div v-else-if="videos.length>0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
             <Card v-for="video in videos" :key="video.id">
               <CardHeader>
                 <video class="w-full h-36 object-cover rounded-lg" :src="video.fileUrl" controls></video>
@@ -78,7 +67,7 @@
                     <CardTitle>{{ video.fileName }}</CardTitle>
                     <p class="text-foreground text-xs">Processed on {{ new Date(video.uploadedAt).toLocaleDateString() }}</p>
                   </div>
-                  <Button variant="secondary" size="sm">Download</Button>
+                  <Button variant="secondary" size="sm" @click="downloadVideo(video.fileUrl, video.fileName)">Download</Button>
                 </div>
               </CardHeader>
             </Card>
@@ -101,24 +90,34 @@
     UploadCloudIcon,
     Wand2Icon
   } from 'lucide-vue-next'
+  import Loader from '@/components/Loader.vue'
+  import ProcessWindow from '@/components/ProcessWindow.vue'
 
   import { ref } from 'vue'
+
   const { user } = useUser();
+  const videoPopup = ref(null)
   const videos = ref([]);
   const pendingVideos = ref([]);
+  const loadedVideos = ref(false);
+  const loadedPending = ref(false);
+  const fileToProcess = ref(null);
 
   const fileInput = ref(null)
+
 
   async function getVideos(userId){
     const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`);
     const data = await response.json();
     videos.value = data;
+    loadedVideos.value = true;
     console.log(data);
   }
   async function getPending(userId){
     const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`);
     const data = await response.json();
     pendingVideos.value = data;
+    loadedPending.value = true;
     console.log(data);
   }
 
@@ -159,6 +158,26 @@
       console.error("Error uploading video:", error);
     }
   };
+
+  const downloadVideo = (url, fileName) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName || 'video.mp4';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const processVideo = (video) =>{
+    videoPopup.value.openPopup()
+    fileToProcess.value = video;
+  }
+
+  const handleProcessing = (data) =>{
+    console.log(data);
+    console.log(fileToProcess.value);
+
+  }
 
   watch(() => user.value, async (newUser) => {
     if(newUser){
