@@ -187,8 +187,14 @@
         fileUrl: fileToProcess.value.fileUrl,
       })
     });
-    if (!response.ok) console.error(`Processing failed with status ${response.status}`);
-    console.log(response.body);
+    if (!response.ok) {
+    console.error(`Processing failed with status ${response.status}`);
+    } else {
+      const result = await response.text();
+      console.log('text', result);
+      const jsonresult = await response.json();
+      console.log('json', jsonresult);
+    }
   }
 
   watch(() => user.value, async (newUser) => {
