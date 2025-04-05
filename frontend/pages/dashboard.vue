@@ -176,7 +176,7 @@
   const handleProcessing = async (data) =>{
     console.log(data);
     console.log(fileToProcess.value);
-    const response = await fetch("/api/videos/process", {
+    const response = await fetch("/api/videos/processVideo", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
