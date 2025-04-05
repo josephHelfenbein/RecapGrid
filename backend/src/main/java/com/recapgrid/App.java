@@ -33,7 +33,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 @SpringBootApplication
 @RestController
@@ -89,7 +88,7 @@ public class App {
                 logger.info("Folder not found, creating folder for user: {}", userId);
                 createDummyFile(folderPath);
             } else logger.error("Error checking folder: {} - Status: {}", folderPath, response.getStatusCode());
-            
+
         } catch (Exception e) {
             logger.error("An error occurred while checking the folder: {}", folderPath, e);
             createDummyFile(folderPath);
@@ -145,12 +144,13 @@ public class App {
     }
 
     @PostMapping("/processVideo")
-    public ResponseEntity<String> processVideo(@RequestBody Processed processed) {
-        if (processed == null) return ResponseEntity.badRequest().body("Processed object is null.");
+    public ResponseEntity<String> processVideo(@RequestBody Video video) {
+        if (video == null) return ResponseEntity.badRequest().body("Processed object is null.");
         try {
-            byte[] videoBytes = downloadVideo(processed.getFileUrl());
+            byte[] videoBytes = downloadVideo(video.getFileUrl());
             if (videoBytes == null || videoBytes.length == 0) return ResponseEntity.badRequest().body("Failed to download video.");
-            
+            logger.info("Processing video: {}", video.getFileName());
+
             String base64Video = Base64.getEncoder().encodeToString(videoBytes);
             RestTemplate restTemplate = new RestTemplate();
             String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
@@ -174,6 +174,8 @@ public class App {
 
             HttpEntity<String> entity = new HttpEntity<>(requestJson, headers);
             String response = restTemplate.postForEntity(url, entity, String.class).getBody();
+            if (response == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process video.");
+            logger.info("Video processed successfully: {}", video.getFileName());
             return ResponseEntity.ok(response);
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to download or encode video.");
@@ -183,6 +185,7 @@ public class App {
         URL url = new URL(fileUrl);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
+        logger.info("Downloading video from URL: {}", fileUrl);
 
         try (InputStream inputStream = connection.getInputStream();
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
