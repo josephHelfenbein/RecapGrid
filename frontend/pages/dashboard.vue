@@ -181,7 +181,11 @@
       headers: {
         "Content-Type": "application/json",
       },
-      body: fileToProcess.value,
+      body: JSON.stringify({
+        userId: fileToProcess.value.userId,
+        fileName: fileToProcess.value.fileName, 
+        fileUrl: fileToProcess.value.fileUrl,
+      })
     });
     if (!response.ok) console.error(`Processing failed with status ${response.status}`);
     console.log(response.body);
