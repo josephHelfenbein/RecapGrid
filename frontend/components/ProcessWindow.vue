@@ -18,13 +18,6 @@
             <option value="robotic">Robotic</option>
             </select>
 
-            <label class="block text-sm font-medium mb-1">Aspect Ratio:</label>
-            <select v-model="selectedAspectRatio" class="w-full bg-secondary p-2 border rounded mb-3">
-            <option value="9:16">9:16 (TikTok/Reels)</option>
-            <option value="16:9">16:9 (YouTube)</option>
-            <option value="1:1">1:1 (Square)</option>
-            </select>
-
             <div class="flex justify-end space-x-2 mt-4">
             <button @click="closePopup" class="px-4 py-2 text-primary bg-secondary rounded">Cancel</button>
             <button @click="processVideo" class="px-4 py-2 text-primary-foreground bg-primary rounded">Process Video</button>
@@ -51,7 +44,6 @@
     emit('submit', {
       feel: selectedFeel.value,
       voice: selectedVoice.value,
-      aspectRatio: selectedAspectRatio.value
     })
     closePopup()
   }
