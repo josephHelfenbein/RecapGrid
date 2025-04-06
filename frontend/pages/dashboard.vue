@@ -176,16 +176,20 @@
   const handleProcessing = async (data) =>{
     console.log(data);
     console.log(fileToProcess.value);
-    const response = await fetch("/api/processVideo", {
+    const queryParams = new URLSearchParams({
+      voice: data.voice,
+      feel: data.feel,
+    });
+    const response = await fetch(`/api/processVideo?${queryParams.toString()}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         userId: fileToProcess.value.userId,
-        fileName: fileToProcess.value.fileName, 
+        fileName: fileToProcess.value.fileName,
         fileUrl: fileToProcess.value.fileUrl,
-      })
+      }),
     });
     if (!response.ok) {
     console.error(`Processing failed with status ${response.status}`);

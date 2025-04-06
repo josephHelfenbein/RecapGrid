@@ -144,7 +144,7 @@ public class App {
     }
 
     @PostMapping("/processVideo")
-    public ResponseEntity<String> processVideo(@RequestBody Video video) {
+    public ResponseEntity<String> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel) {
         if (video == null) return ResponseEntity.badRequest().body("Processed object is null.");
         try {
             byte[] videoBytes = downloadVideo(video.getFileUrl());
@@ -152,15 +152,27 @@ public class App {
             logger.info("Processing video: {}", video.getFileName());
 
             String base64Video = Base64.getEncoder().encodeToString(videoBytes);
-            RestTemplate restTemplate = new RestTemplate();
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            StringBuilder promptBuilder = new StringBuilder();
+            promptBuilder.append("Summarize this video for an editor.\n").append("1. First, list important timestamps where meaningful events happen (format: [start-end]).\n");
+
+            if (!voice.equalsIgnoreCase("none")) {
+                promptBuilder.append("2. Then, write a short narration in a ")
+                            .append(feel.toLowerCase()).append(" tone ")
+                            .append("to accompany these clips, spoken in a ")
+                            .append(voice.toLowerCase()).append(" voice.");
+            } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
+
+            promptBuilder.append("\n\nReturn the response as a JSON object with this format:\n")
+                .append("{ \"timestamps\": [\"0:05-0:07\", \"0:12-0:15\"], \"narration\": \"...\" }");
+
+            String prompt = promptBuilder.toString();
+
             String requestJson = """
             {
             "contents": [{
                 "parts": [
-                { "text": "Can you summarize this video?" },
+                { "text": "%s" },
                 {
                     "inline_data": {
                     "mime_type": "video/mp4",
@@ -170,7 +182,12 @@ public class App {
                 ]
             }]
             }
-            """.formatted(base64Video);
+            """.formatted(prompt, base64Video);
+
+            RestTemplate restTemplate = new RestTemplate();
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<String> entity = new HttpEntity<>(requestJson, headers);
             String response = restTemplate.postForEntity(url, entity, String.class).getBody();

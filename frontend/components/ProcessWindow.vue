@@ -7,8 +7,8 @@
             <label class="block text-sm font-medium mb-1">Feel of the Video:</label>
             <select v-model="selectedFeel" class="w-full bg-secondary p-2 border rounded mb-3">
             <option value="cinematic">Cinematic</option>
-            <option value="fast-paced">Comedic</option>
-            <option value="calm">Informational</option>
+            <option value="funny">Funny</option>
+            <option value="informational">Informational</option>
             </select>
 
             <label class="block text-sm font-medium mb-1">AI Voice:</label>
@@ -16,6 +16,7 @@
             <option value="male">Male</option>
             <option value="female">Female</option>
             <option value="robotic">Robotic</option>
+            <option value="none">No narration</option>
             </select>
 
             <div class="flex justify-end space-x-2 mt-4">
