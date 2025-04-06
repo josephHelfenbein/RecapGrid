@@ -167,18 +167,6 @@ public class App {
                             .append(voice.toLowerCase()).append(" voice.");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
-            Map<String, Object> responseSchema = Map.of(
-                "type", "object",
-                "properties", Map.of(
-                    "timestamps", Map.of(
-                        "type", "array",
-                        "items", Map.of("type", "string")
-                    ),
-                    "narration", Map.of("type", "string")
-                ),
-                "required", List.of("timestamps", "narration")
-            );
-
             ObjectMapper mapper = new ObjectMapper();
             Map<String, Object> requestBody = Map.of(
                 "contents", List.of(Map.of("parts", List.of(
@@ -188,8 +176,16 @@ public class App {
                         "data", base64Video
                     ))
                 ))),
-                "responseMimeType", "application/json",
-                "responseSchema", responseSchema
+                "generationConfig", Map.of(
+                    "response_mime_type", "application/json",
+                    "response_schema", Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                            "timestamps", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
+                            "narration", Map.of("type", "STRING")
+                        )
+                    )
+                )
             );
 
             String requestJson = mapper.writeValueAsString(requestBody);
