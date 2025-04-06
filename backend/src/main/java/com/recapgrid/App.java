@@ -179,10 +179,13 @@ public class App {
                 "generationConfig", Map.of(
                     "response_mime_type", "application/json",
                     "response_schema", Map.of(
-                        "type", "OBJECT",
-                        "properties", Map.of(
-                            "timestamps", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
-                            "narration", Map.of("type", "STRING")
+                        "type", "ARRAY",
+                        "items", Map.of(
+                            "type", "OBJECT",
+                            "properties", Map.of(
+                                "timestamps", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
+                                "narration", Map.of("type", "STRING")
+                            )
                         )
                     )
                 )
