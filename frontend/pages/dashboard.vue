@@ -195,6 +195,8 @@
     else {
       const result = await response.json();
       console.log(result);
+      const resultText = await response.text();
+      console.log(resultText);
     }
   }
 
