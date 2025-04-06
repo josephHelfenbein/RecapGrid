@@ -191,10 +191,9 @@
         fileUrl: fileToProcess.value.fileUrl,
       }),
     });
-    if (!response.ok) {
-    console.error(`Processing failed with status ${response.status}`);
-    } else {
-      const result = await response.text();
+    if (!response.ok) console.error(`Processing failed with status ${response.status}`);
+    else {
+      const result = await response.json();
       console.log(result);
     }
   }

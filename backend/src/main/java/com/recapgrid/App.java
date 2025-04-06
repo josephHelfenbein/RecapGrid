@@ -202,12 +202,8 @@ public class App {
 
             String responseBody = response.getBody();
             if (responseBody == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Empty response from Gemini.");
-            
 
-            JsonNode jsonResponse = mapper.readTree(responseBody);
-            JsonNode result = jsonResponse.path("candidates").get(0).path("content").path("parts").get(0).path("data");
-
-            return ResponseEntity.ok(result.toString());
+            return ResponseEntity.ok(responseBody.toString());
 
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("IO error: " + e.getMessage());
