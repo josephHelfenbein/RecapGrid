@@ -194,7 +194,7 @@ public class App {
             Map<String, Object> requestBody = Map.of(
                 "contents", List.of(contents),
                 "response_mime_type", "application/json",
-                "response_schema", responseSchema
+                "responseSchema", responseSchema
             );
 
             ObjectMapper mapper = new ObjectMapper();
@@ -206,27 +206,19 @@ public class App {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<String> entity = new HttpEntity<>(requestJson, headers);
-            ResponseEntity<String> responseEntity = restTemplate.postForEntity(url, entity, String.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
 
-            if (!responseEntity.getStatusCode().is2xxSuccessful()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process video.");
+            if (!response.getStatusCode().is2xxSuccessful()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process video.");
 
-            String responseBody = responseEntity.getBody();
-            if (responseBody == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Empty response from Gemini API.");
+            String responseBody = response.getBody();
+            if (responseBody == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Empty response from Gemini.");
             
-            JsonNode jsonResponse = mapper.readTree(responseBody);
-            JsonNode candidates = jsonResponse.path("candidates");
-            if (candidates.isArray() && candidates.size() > 0) {
-                JsonNode content = candidates.get(0).path("content");
-                JsonNode partsNode = content.path("parts");
-                if (partsNode.isArray() && partsNode.size() > 0) {
-                    JsonNode responseData = partsNode.get(0).path("data");
-                    if (!responseData.isMissingNode()) {
-                        return ResponseEntity.ok(responseData.toString());
-                    }
-                }
-            }
 
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Invalid response format from Gemini API.");
+            JsonNode json = mapper.readTree(responseBody);
+            JsonNode result = json.path("candidates").get(0).path("content").path("parts").get(0).path("data");
+
+            return ResponseEntity.ok(result.toString());
+
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to download or encode video.");
         } catch (Exception e) {
