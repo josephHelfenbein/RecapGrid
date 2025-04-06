@@ -195,9 +195,7 @@
     console.error(`Processing failed with status ${response.status}`);
     } else {
       const result = await response.text();
-      console.log('text', result);
-      const jsonresult = await response.json();
-      console.log('json', jsonresult);
+      console.log(result);
     }
   }
 

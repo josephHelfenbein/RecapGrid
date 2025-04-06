@@ -1,6 +1,7 @@
 package com.recapgrid;
 
 import com.recapgrid.model.Video;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.Processed;
 import com.recapgrid.model.UserEntity;
@@ -32,6 +33,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @SpringBootApplication
@@ -154,7 +156,8 @@ public class App {
             String base64Video = Base64.getEncoder().encodeToString(videoBytes);
 
             StringBuilder promptBuilder = new StringBuilder();
-            promptBuilder.append("Summarize this video for an editor.\n").append("1. First, list important timestamps where meaningful events happen (format: [start-end]).\n");
+            promptBuilder.append("Summarize this video for an editor.\n")
+                .append("1. First, list important timestamps where meaningful events happen (format: [start-end]).\n");
 
             if (!voice.equalsIgnoreCase("none")) {
                 promptBuilder.append("2. Then, write a short narration in a ")
@@ -168,21 +171,21 @@ public class App {
 
             String prompt = promptBuilder.toString();
 
-            String requestJson = """
-            {
-            "contents": [{
-                "parts": [
-                { "text": "%s" },
-                {
-                    "inline_data": {
-                    "mime_type": "video/mp4",
-                    "data": "%s"
-                    }
-                }
-                ]
-            }]
-            }
-            """.formatted(prompt, base64Video);
+            ObjectMapper mapper = new ObjectMapper();
+
+            Map<String, Object> inlineData = Map.of(
+                "mime_type", "video/mp4",
+                "data", base64Video
+            );
+            List<Object> parts = List.of(
+                Map.of("text", prompt),
+                Map.of("inline_data", inlineData)
+            );
+
+            Map<String, Object> contents = Map.of("parts", parts);
+            Map<String, Object> requestBody = Map.of("contents", List.of(contents));
+
+            String requestJson = mapper.writeValueAsString(requestBody);
 
             RestTemplate restTemplate = new RestTemplate();
             String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
@@ -194,10 +197,14 @@ public class App {
             if (response == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process video.");
             logger.info("Video processed successfully: {}", video.getFileName());
             return ResponseEntity.ok(response);
+
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to download or encode video.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error: " + e.getMessage());
         }
     }
+
     public byte[] downloadVideo(String fileUrl) throws IOException {
         URL url = new URL(fileUrl);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
