@@ -183,8 +183,22 @@ public class App {
             );
 
             Map<String, Object> contents = Map.of("parts", parts);
-            Map<String, Object> requestBody = Map.of("contents", List.of(contents));
-
+            Map<String, Object> responseSchema = Map.of(
+                "type", "object",
+                "properties", Map.of(
+                    "timestamps", Map.of(
+                        "type", "array",
+                        "items", Map.of("type", "string")
+                    ),
+                    "narration", Map.of("type", "string")
+                ),
+                "required", List.of("timestamps", "narration")
+            );
+            Map<String, Object> requestBody = Map.of(
+                "contents", List.of(contents),
+                "response_mime_type", "application/json",
+                "responseSchema", responseSchema
+            );
             String requestJson = mapper.writeValueAsString(requestBody);
 
             RestTemplate restTemplate = new RestTemplate();
