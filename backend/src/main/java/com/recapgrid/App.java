@@ -167,9 +167,6 @@ public class App {
                             .append(voice.toLowerCase()).append(" voice.");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
-
-            String prompt = promptBuilder.toString();
-
             Map<String, Object> responseSchema = Map.of(
                 "type", "object",
                 "properties", Map.of(
@@ -182,50 +179,46 @@ public class App {
                 "required", List.of("timestamps", "narration")
             );
 
-            Map<String, Object> inlineData = Map.of(
-                "mime_type", "video/mp4",
-                "data", base64Video
-            );
-            List<Object> parts = List.of(
-                Map.of("text", prompt),
-                Map.of("inline_data", inlineData)
-            );
-            Map<String, Object> contents = Map.of("parts", parts);
+            ObjectMapper mapper = new ObjectMapper();
             Map<String, Object> requestBody = Map.of(
-                "contents", List.of(contents),
-                "response_mime_type", "application/json",
+                "contents", List.of(Map.of("parts", List.of(
+                    Map.of("text", promptBuilder.toString()),
+                    Map.of("inline_data", Map.of(
+                        "mime_type", "video/mp4",
+                        "data", base64Video
+                    ))
+                ))),
+                "responseMimeType", "application/json",
                 "responseSchema", responseSchema
             );
 
-            ObjectMapper mapper = new ObjectMapper();
             String requestJson = mapper.writeValueAsString(requestBody);
 
-            RestTemplate restTemplate = new RestTemplate();
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-
             HttpEntity<String> entity = new HttpEntity<>(requestJson, headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
 
-            if (!response.getStatusCode().is2xxSuccessful()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process video.");
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+
+            if (!response.getStatusCode().is2xxSuccessful()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Gemini API error: " + response.getStatusCode());
 
             String responseBody = response.getBody();
             if (responseBody == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Empty response from Gemini.");
             
 
-            JsonNode json = mapper.readTree(responseBody);
-            JsonNode result = json.path("candidates").get(0).path("content").path("parts").get(0).path("data");
+            JsonNode jsonResponse = mapper.readTree(responseBody);
+            JsonNode result = jsonResponse.path("candidates").get(0).path("content").path("parts").get(0).path("data");
 
             return ResponseEntity.ok(result.toString());
 
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to download or encode video.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("IO error: " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
         }
     }
-
 
     public byte[] downloadVideo(String fileUrl) throws IOException {
         URL url = new URL(fileUrl);
