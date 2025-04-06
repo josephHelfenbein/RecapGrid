@@ -1,6 +1,7 @@
 package com.recapgrid;
 
 import com.recapgrid.model.Video;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.Processed;
@@ -166,23 +167,9 @@ public class App {
                             .append(voice.toLowerCase()).append(" voice.");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
-            promptBuilder.append("\n\nReturn the response as a JSON object with this format:\n")
-                .append("{ \"timestamps\": [\"0:05-0:07\", \"0:12-0:15\"], \"narration\": \"...\" }");
 
             String prompt = promptBuilder.toString();
 
-            ObjectMapper mapper = new ObjectMapper();
-
-            Map<String, Object> inlineData = Map.of(
-                "mime_type", "video/mp4",
-                "data", base64Video
-            );
-            List<Object> parts = List.of(
-                Map.of("text", prompt),
-                Map.of("inline_data", inlineData)
-            );
-
-            Map<String, Object> contents = Map.of("parts", parts);
             Map<String, Object> responseSchema = Map.of(
                 "type", "object",
                 "properties", Map.of(
@@ -194,11 +181,23 @@ public class App {
                 ),
                 "required", List.of("timestamps", "narration")
             );
+
+            Map<String, Object> inlineData = Map.of(
+                "mime_type", "video/mp4",
+                "data", base64Video
+            );
+            List<Object> parts = List.of(
+                Map.of("text", prompt),
+                Map.of("inline_data", inlineData)
+            );
+            Map<String, Object> contents = Map.of("parts", parts);
             Map<String, Object> requestBody = Map.of(
                 "contents", List.of(contents),
                 "response_mime_type", "application/json",
-                "responseSchema", responseSchema
+                "response_schema", responseSchema
             );
+
+            ObjectMapper mapper = new ObjectMapper();
             String requestJson = mapper.writeValueAsString(requestBody);
 
             RestTemplate restTemplate = new RestTemplate();
@@ -207,17 +206,34 @@ public class App {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<String> entity = new HttpEntity<>(requestJson, headers);
-            String response = restTemplate.postForEntity(url, entity, String.class).getBody();
-            if (response == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process video.");
-            logger.info("Video processed successfully: {}", video.getFileName());
-            return ResponseEntity.ok(response);
+            ResponseEntity<String> responseEntity = restTemplate.postForEntity(url, entity, String.class);
 
+            if (!responseEntity.getStatusCode().is2xxSuccessful()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process video.");
+
+            String responseBody = responseEntity.getBody();
+            if (responseBody == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Empty response from Gemini API.");
+            
+            JsonNode jsonResponse = mapper.readTree(responseBody);
+            JsonNode candidates = jsonResponse.path("candidates");
+            if (candidates.isArray() && candidates.size() > 0) {
+                JsonNode content = candidates.get(0).path("content");
+                JsonNode partsNode = content.path("parts");
+                if (partsNode.isArray() && partsNode.size() > 0) {
+                    JsonNode responseData = partsNode.get(0).path("data");
+                    if (!responseData.isMissingNode()) {
+                        return ResponseEntity.ok(responseData.toString());
+                    }
+                }
+            }
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Invalid response format from Gemini API.");
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to download or encode video.");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Unexpected error: " + e.getMessage());
         }
     }
+
 
     public byte[] downloadVideo(String fileUrl) throws IOException {
         URL url = new URL(fileUrl);
