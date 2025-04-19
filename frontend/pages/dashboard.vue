@@ -152,9 +152,7 @@ import { SignedOut } from '@clerk/vue';
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error(`Upload failed with status ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Upload failed with status ${response.status}`);
 
       const data = await response.json();
       pendingVideos.value.push(data);
@@ -184,21 +182,24 @@ import { SignedOut } from '@clerk/vue';
       voice: data.voice,
       feel: data.feel,
     });
-    const response = await fetch(`/api/processVideo?${queryParams.toString()}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId: fileToProcess.value.userId,
-        fileName: fileToProcess.value.fileName,
-        fileUrl: fileToProcess.value.fileUrl,
-      }),
-    });
-    if (!response.ok) console.error(`Processing failed with status ${response.status}`);
-    else {
+    try{
+      const response = await fetch(`/api/processVideo?${queryParams.toString()}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: fileToProcess.value.userId,
+          fileName: fileToProcess.value.fileName,
+          fileUrl: fileToProcess.value.fileUrl,
+        }),
+      });
+      if (!response.ok) throw new Error(`Processing failed with status ${response.status}`);
+
       const data = await response.json();
-      loadedVideos.value.push(data);
+      videos.value.push(data);
+    } catch (error) {
+      console.error("Error processing video:", error);
     }
   }
 

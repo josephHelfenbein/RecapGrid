@@ -248,38 +248,53 @@ public class App {
 
             int i = 0;
             for(JsonNode timestampNode : timestampsNode){
-                String timestamp = timestampNode.asText();
-                String[] parts = timestamp.split("-");
+                String[] parts = timestampNode.asText().split("-");
                 if (parts.length != 2) {
-                    logger.warn("Skipping malformed timestamp: {}", timestamp);
+                    logger.warn("Skipping malformed timestamp: {}", timestampNode.asText());
                     continue;
                 }
                 String start = normalizeTime(parts[0].trim());
                 String end   = normalizeTime(parts[1].trim());
                 File seg = tmpDir.resolve("seg" + (i++) + ".mp4").toFile();
-                new ProcessBuilder(
+                ProcessBuilder processBuilder = new ProcessBuilder(
                     "ffmpeg", "-y",
                     "-i", original.getAbsolutePath(),
                     "-ss", start,
                     "-to", end,
                     "-c", "copy",
                     seg.getAbsolutePath()
-                ).inheritIO().start().waitFor();
+                );
+                processBuilder.inheritIO();
+                Process process = processBuilder.start();
+                int code = process.waitFor();
+                if (code != 0) {
+                    logger.error("Error processing segment: {} - Code: {}", timestampNode.asText(), code);
+                    continue;
+                }
                 segmentPaths.add(seg.getAbsolutePath());
             }
             File listFile = tmpDir.resolve("list.txt").toFile();
             try (PrintWriter writer = new PrintWriter(listFile)){
-                for(String p : segmentPaths) writer.println("file '"+p.replace("'", "\\'") + "'");
+                for(String p : segmentPaths) writer.println("file '" + p.replace("'", "\\'") + "'");
             }
             File output = tmpDir.resolve("output.mp4").toFile();
-            new ProcessBuilder(
+            ProcessBuilder concatProcessBuilder = new ProcessBuilder(
                 "ffmpeg", "-y",
                 "-f", "concat",
                 "-safe", "0",
                 "-i", listFile.getAbsolutePath(),
-                "-c", "copy",
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-movflags", "+faststart",
                 output.getAbsolutePath()
-            ).inheritIO().start().waitFor();
+            );
+            concatProcessBuilder.inheritIO();
+            Process process = concatProcessBuilder.start();
+            int concatCode = process.waitFor();
+            if (concatCode != 0) {
+                logger.error("Error concatenating segments - Code: {}", concatCode);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
             return uploadProcessed(userId, output, "processed-" + video.getFileName()); 
 
         } catch (IOException e) {
