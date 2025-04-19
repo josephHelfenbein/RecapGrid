@@ -3,6 +3,7 @@ package com.recapgrid;
 import com.recapgrid.model.Video;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.Processed;
 import com.recapgrid.model.UserEntity;
@@ -228,23 +229,33 @@ public class App {
                 logger.error("Empty response from Gemini.");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            logger.info("Response from Gemini: {}", responseBody);
+            logger.info("Received response from Gemini");
 
             mapper = new ObjectMapper();
-            JsonNode arr = mapper.readTree(responseBody);
-            JsonNode timestampsNode = arr.get(0).get("timestamps");
-            List<String> timestamps = new ArrayList<>();
-            for(JsonNode timestamp : timestampsNode) timestamps.add(timestamp.asText());
+            JsonNode root = mapper.readTree(responseBody);
+
+            JsonNode partsNode = root.path("candidates").get(0).path("content").path("parts");
+            String textContent = partsNode.get(0).path("text").asText();
+
+            ArrayNode structured = (ArrayNode) mapper.readTree(textContent);
+
+            JsonNode timestampsNode = structured.get(0).path("timestamps");
+            if (!timestampsNode.isArray()) throw new IllegalStateException("Expected timestamps array, got: " + timestampsNode);
             
             File original = originalPath.toFile();
             Path tmpDir = Files.createTempDirectory("splice-");
             List<String> segmentPaths = new ArrayList<>();
 
             int i = 0;
-            for(String timestamp : timestamps){
+            for(JsonNode timestampNode : timestampsNode){
+                String timestamp = timestampNode.asText();
                 String[] parts = timestamp.split("-");
-                String start = parts[0].trim();
-                String end = parts[1].trim();
+                if (parts.length != 2) {
+                    logger.warn("Skipping malformed timestamp: {}", timestamp);
+                    continue;
+                }
+                String start = normalizeTime(parts[0].trim());
+                String end   = normalizeTime(parts[1].trim());
                 File seg = tmpDir.resolve("seg" + (i++) + ".mp4").toFile();
                 new ProcessBuilder(
                     "ffmpeg", "-y",
@@ -278,6 +289,25 @@ public class App {
             logger.error("Error while processing video: {}", video.getFileName(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    private String normalizeTime(String time){
+        String[] segs = time.split(":");
+        try{
+            if(segs.length == 2){
+                int m = Integer.parseInt(segs[0]);
+                int s = Integer.parseInt(segs[1]);
+                return String.format("%02d:%02d", m, s);
+            } else if(segs.length == 3){
+                int h = Integer.parseInt(segs[0]);
+                int m = Integer.parseInt(segs[1]);
+                int s = Integer.parseInt(segs[2]);
+                return String.format("%02d:%02d:%02d", h, m, s);
+            }
+        } catch(NumberFormatException e){
+            logger.warn("Invalid time format: {}", time);
+        }
+        return time;
     }
 
     public byte[] downloadVideo(String fileUrl) throws IOException {
