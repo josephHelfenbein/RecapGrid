@@ -1,5 +1,8 @@
 <template>
     <div class="h-screen bg-background flex pt-20">
+      <SignedOut>
+        <RedirectToSignUp />
+      </SignedOut>
       <main class="flex-1 overflow-auto">
         <div class="w-screen flex justify-center">
         <div class="container max-w-4xl py-6">
@@ -94,6 +97,7 @@
   import ProcessWindow from '@/components/ProcessWindow.vue'
 
   import { ref } from 'vue'
+import { SignedOut } from '@clerk/vue';
 
   const { user } = useUser();
   const videoPopup = ref(null)
@@ -193,8 +197,8 @@
     });
     if (!response.ok) console.error(`Processing failed with status ${response.status}`);
     else {
-      const result = await response.json();
-      console.log(result);
+      const data = await response.json();
+      loadedVideos.value.push(data);
     }
   }
 

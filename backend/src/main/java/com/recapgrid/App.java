@@ -10,6 +10,7 @@ import com.recapgrid.repository.VideoRepository;
 import com.recapgrid.repository.ProcessedRepository;
 import com.recapgrid.repository.UserRepository;
 
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import org.slf4j.Logger;
@@ -27,11 +28,15 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriUtils;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -147,12 +152,21 @@ public class App {
     }
 
     @PostMapping("/processVideo")
-    public ResponseEntity<String> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel) {
-        if (video == null) return ResponseEntity.badRequest().body("Processed object is null.");
+    public ResponseEntity<Processed> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel, @RequestParam String userId) {
+        if (video == null) {
+            logger.error("Processed object is null.");
+            return ResponseEntity.badRequest().body(null);
+        }
         try {
             byte[] videoBytes = downloadVideo(video.getFileUrl());
-            if (videoBytes == null || videoBytes.length == 0) return ResponseEntity.badRequest().body("Failed to download video.");
+            if (videoBytes == null || videoBytes.length == 0) {
+                logger.error("Failed to download video from URL: {}", video.getFileUrl());
+                return ResponseEntity.badRequest().body(null);
+            }
             logger.info("Processing video: {}", video.getFileName());
+
+            Path originalPath = Files.createTempFile("orig-", ".mp4");
+            Files.write(originalPath, videoBytes);
 
             String base64Video = Base64.getEncoder().encodeToString(videoBytes);
 
@@ -201,17 +215,64 @@ public class App {
             RestTemplate restTemplate = new RestTemplate();
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
 
-            if (!response.getStatusCode().is2xxSuccessful()) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Gemini API error: " + response.getStatusCode());
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                logger.error("Error processing video: {} - Status: {}, Response: {}", video.getFileName(), response.getStatusCode(), response.getBody());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
 
             String responseBody = response.getBody();
-            if (responseBody == null) return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Empty response from Gemini.");
+            if (responseBody == null) {
+                logger.error("Empty response from Gemini.");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+            
+            mapper = new ObjectMapper();
+            JsonNode arr = mapper.readTree(responseBody);
+            JsonNode timestampsNode = arr.get(0).get("timestamps");
+            List<String> timestamps = new ArrayList<>();
+            for(JsonNode timestamp : timestampsNode) timestamps.add(timestamp.asText());
+            
+            File original = originalPath.toFile();
+            Path tmpDir = Files.createTempDirectory("splice-");
+            List<String> segmentPaths = new ArrayList<>();
 
-            return ResponseEntity.ok(responseBody.toString());
+            int i = 0;
+            for(String timestamp : timestamps){
+                String[] parts = timestamp.split("-");
+                String start = parts[0].trim();
+                String end = parts[1].trim();
+                File seg = tmpDir.resolve("seg" + (i++) + ".mp4").toFile();
+                new ProcessBuilder(
+                    "ffmpeg", "-y",
+                    "-i", original.getAbsolutePath(),
+                    "-ss", start,
+                    "-to", end,
+                    "-c", "copy",
+                    seg.getAbsolutePath()
+                ).inheritIO().start().waitFor();
+                segmentPaths.add(seg.getAbsolutePath());
+            }
+            File listFile = tmpDir.resolve("list.txt").toFile();
+            try (PrintWriter writer = new PrintWriter(listFile)){
+                for(String p : segmentPaths) writer.println("file '"+p.replace("'", "\\'") + "'");
+            }
+            File output = tmpDir.resolve("output.mp4").toFile();
+            new ProcessBuilder(
+                "ffmpeg", "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", listFile.getAbsolutePath(),
+                "-c", "copy",
+                output.getAbsolutePath()
+            ).inheritIO().start().waitFor();
+            return uploadProcessed(userId, output, "processed-" + video.getFileName()); 
 
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("IO error: " + e.getMessage());
+            logger.error("IO error while processing video: {}", video.getFileName(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+            logger.error("Error while processing video: {}", video.getFileName(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
@@ -227,6 +288,46 @@ public class App {
             int bytesRead;
             while ((bytesRead = inputStream.read(buffer)) != -1)  outputStream.write(buffer, 0, bytesRead);
             return outputStream.toByteArray();
+        }
+    }
+
+    private ResponseEntity<Processed> uploadProcessed(
+        String userId,
+        File fileData,
+        String fileName) {
+        
+        logger.info("Uploading processed video '{}' for user: {}", fileName, userId);
+        ensureUserFolderExists(userId, "processed");
+
+        String encodedFileName = UriUtils.encodePath(fileName, StandardCharsets.UTF_8);
+        String storagePath = "processed/" + userId + "/" + encodedFileName;
+        String uploadUrl = supabaseUrl + "/storage/v1/object/" + storagePath;
+
+        HttpHeaders headers = createHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        HttpEntity<ByteArrayResource> uploadEntity;
+        try {
+            ByteArrayResource resource = new ByteArrayResource(Files.readAllBytes(fileData.toPath())) {
+                @Override public String getFilename() { return fileName; }
+            };
+            uploadEntity = new HttpEntity<>(resource, headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
+                Processed saving = new Processed(userId, fileName, fileUrl);
+                processedRepository.save(saving);
+                logger.info("Processed video uploaded successfully: {}", fileUrl);
+                return ResponseEntity.ok(saving);
+            } else {
+                logger.error("Error uploading processed video '{}', Status: {}, Response: {}", fileName, response.getStatusCode(), response.getBody());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        } catch (Exception e) {
+            logger.error("Error uploading video '{}'", fileName, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
