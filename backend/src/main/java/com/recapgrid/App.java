@@ -337,16 +337,23 @@ public class App {
         String storagePath = "processed/" + userId + "/" + encodedFileName;
         String uploadUrl = supabaseUrl + "/storage/v1/object/" + storagePath;
 
-        HttpHeaders headers = createHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-        HttpEntity<ByteArrayResource> uploadEntity;
+        byte[] bytes;
         try {
-            ByteArrayResource resource = new ByteArrayResource(Files.readAllBytes(fileData.toPath())) {
-                @Override public String getFilename() { return fileName; }
-            };
-            uploadEntity = new HttpEntity<>(resource, headers);
+            bytes = Files.readAllBytes(fileData.toPath());
+        } catch (IOException e) {
+            logger.error("Failed to read processed file bytes", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
 
+        HttpHeaders headers = createHeaders();
+        String ct = null;
+        try {
+            ct = Files.probeContentType(fileData.toPath());
+        } catch (IOException ignored) { }
+        headers.set("Content-Type", ct != null ? ct : MediaType.APPLICATION_OCTET_STREAM_VALUE);
+
+        HttpEntity<byte[]> uploadEntity = new HttpEntity<>(bytes, headers);
+        try {
             ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
