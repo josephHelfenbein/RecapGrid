@@ -152,11 +152,12 @@ public class App {
     }
 
     @PostMapping("/processVideo")
-    public ResponseEntity<Processed> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel, @RequestParam String userId) {
+    public ResponseEntity<Processed> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel) {
         if (video == null) {
             logger.error("Processed object is null.");
             return ResponseEntity.badRequest().body(null);
         }
+        String userId = video.getUserId();
         try {
             byte[] videoBytes = downloadVideo(video.getFileUrl());
             if (videoBytes == null || videoBytes.length == 0) {
@@ -165,8 +166,10 @@ public class App {
             }
             logger.info("Processing video: {}", video.getFileName());
 
+
             Path originalPath = Files.createTempFile("orig-", ".mp4");
             Files.write(originalPath, videoBytes);
+            logger.info("Saved original video to temporary file: {}", originalPath.toAbsolutePath());
 
             String base64Video = Base64.getEncoder().encodeToString(videoBytes);
 
@@ -225,7 +228,8 @@ public class App {
                 logger.error("Empty response from Gemini.");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            
+            logger.info("Response from Gemini: {}", responseBody);
+
             mapper = new ObjectMapper();
             JsonNode arr = mapper.readTree(responseBody);
             JsonNode timestampsNode = arr.get(0).get("timestamps");
@@ -268,10 +272,10 @@ public class App {
             return uploadProcessed(userId, output, "processed-" + video.getFileName()); 
 
         } catch (IOException e) {
-            logger.error("IO error while processing video: {}", video.getFileName(), e.getMessage());
+            logger.error("IO error while processing video: {}", video.getFileName(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         } catch (Exception e) {
-            logger.error("Error while processing video: {}", video.getFileName(), e.getMessage());
+            logger.error("Error while processing video: {}", video.getFileName(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
