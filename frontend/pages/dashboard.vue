@@ -183,6 +183,7 @@ import { SignedOut } from '@clerk/vue';
     const queryParams = new URLSearchParams({
       voice: data.voice,
       feel: data.feel,
+      userId: user.value.id,
     });
     const response = await fetch(`/api/processVideo?${queryParams.toString()}`, {
       method: "POST",
