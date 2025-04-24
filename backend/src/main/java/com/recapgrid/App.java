@@ -14,6 +14,8 @@ import com.recapgrid.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Comparator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,16 +34,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @SpringBootApplication
 @RestController
@@ -159,20 +165,29 @@ public class App {
             return ResponseEntity.badRequest().body(null);
         }
         String userId = video.getUserId();
+        Path gcsTempDir = Paths.get("/mnt/gcs", "temp", userId, UUID.randomUUID().toString());
+        ResponseEntity<Processed> result;
         try {
-            byte[] videoBytes = downloadVideo(video.getFileUrl());
-            if (videoBytes == null || videoBytes.length == 0) {
-                logger.error("Failed to download video from URL: {}", video.getFileUrl());
-                return ResponseEntity.badRequest().body(null);
+            Files.createDirectories(gcsTempDir);
+            logger.info("Created temporary directory: {}", gcsTempDir.toAbsolutePath());
+            Path originalPath = gcsTempDir.resolve("orig-" + UUID.randomUUID() + ".mp4");
+            logger.info("Temporary original video path: {}", originalPath.toAbsolutePath());
+
+            logger.info("Downloading video to: {}", originalPath);
+            try (InputStream in = new URL(video.getFileUrl()).openStream();
+                OutputStream out = Files.newOutputStream(originalPath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                byte[] buf = new byte[8192];
+                int len;
+                while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
             }
-            logger.info("Processing video: {}", video.getFileName());
+            logger.info("Saved original video to GCS temp: {}", originalPath);
 
-
-            Path originalPath = Files.createTempFile("orig-", ".mp4");
-            Files.write(originalPath, videoBytes);
-            logger.info("Saved original video to temporary file: {}", originalPath.toAbsolutePath());
-
-            String base64Video = Base64.getEncoder().encodeToString(videoBytes);
+            String base64Video = base64EncodeFile(originalPath);
+            logger.info("Encoded video to Base64");
+            if (base64Video == null) {
+                logger.error("Failed to encode video to Base64.");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
 
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("Summarize this video for an editor.\n")
@@ -242,8 +257,6 @@ public class App {
             JsonNode timestampsNode = structured.get(0).path("timestamps");
             if (!timestampsNode.isArray()) throw new IllegalStateException("Expected timestamps array, got: " + timestampsNode);
             
-            File original = originalPath.toFile();
-            Path tmpDir = Files.createTempDirectory("splice-");
             List<String> segmentPaths = new ArrayList<>();
 
             int i = 0;
@@ -255,14 +268,16 @@ public class App {
                 }
                 String start = normalizeTime(parts[0].trim());
                 String end   = normalizeTime(parts[1].trim());
-                File seg = tmpDir.resolve("seg" + (i++) + ".mp4").toFile();
+                Path seg = gcsTempDir.resolve("seg-" + (i++) + ".mp4");
+                logger.info("Creating segment {} -> {}", seg, timestampNode.asText());
+
                 ProcessBuilder processBuilder = new ProcessBuilder(
                     "ffmpeg", "-y",
-                    "-i", original.getAbsolutePath(),
+                    "-i", originalPath.toString(),
                     "-ss", start,
                     "-to", end,
                     "-c", "copy",
-                    seg.getAbsolutePath()
+                    seg.toString()
                 );
                 processBuilder.inheritIO();
                 Process process = processBuilder.start();
@@ -271,22 +286,22 @@ public class App {
                     logger.error("Error processing segment: {} - Code: {}", timestampNode.asText(), code);
                     continue;
                 }
-                segmentPaths.add(seg.getAbsolutePath());
+                segmentPaths.add(seg.toString());
             }
-            File listFile = tmpDir.resolve("list.txt").toFile();
-            try (PrintWriter writer = new PrintWriter(listFile)){
+            Path listFile = gcsTempDir.resolve("list.txt");
+            try (PrintWriter writer = new PrintWriter(listFile.toFile())){
                 for(String p : segmentPaths) writer.println("file '" + p.replace("'", "\\'") + "'");
             }
-            File output = tmpDir.resolve("output.mp4").toFile();
+            Path output = gcsTempDir.resolve("output-" + UUID.randomUUID() + ".mp4");
             ProcessBuilder concatProcessBuilder = new ProcessBuilder(
                 "ffmpeg", "-y",
                 "-f", "concat",
                 "-safe", "0",
-                "-i", listFile.getAbsolutePath(),
+                "-i", listFile.toString(),
                 "-c:v", "libx264",
                 "-c:a", "aac",
                 "-movflags", "+faststart",
-                output.getAbsolutePath()
+                output.toString()
             );
             concatProcessBuilder.inheritIO();
             Process process = concatProcessBuilder.start();
@@ -295,15 +310,41 @@ public class App {
                 logger.error("Error concatenating segments - Code: {}", concatCode);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            return uploadProcessed(userId, output, "processed-" + video.getFileName()); 
+            result = uploadProcessed(userId, output.toFile(), "processed-" + video.getFileName()); 
 
         } catch (IOException e) {
             logger.error("IO error while processing video: {}", video.getFileName(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            result = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         } catch (Exception e) {
             logger.error("Error while processing video: {}", video.getFileName(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            result = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        } finally {
+            try {
+                Files.walk(gcsTempDir).sorted(Comparator.reverseOrder()).forEach(p->{
+                    try{
+                        Files.deleteIfExists(p);
+                    } catch(IOException e){
+                        logger.error("Error deleting file: {}", p, e);
+                    }
+                });
+                logger.info("Cleaned up temp directory: {}", gcsTempDir);
+            } catch (IOException e){
+                logger.error("Error cleaning up temp directory: {}", gcsTempDir, e);
+            }
         }
+        return result;
+    }
+
+    private String base64EncodeFile(Path path) throws IOException{
+        try(ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            OutputStream b64Out = Base64.getEncoder().wrap(baos);
+            InputStream in = Files.newInputStream(path, StandardOpenOption.READ)){
+                byte[] buffer = new byte[8 * 1024];
+                int len;
+                while((len = in.read(buffer)) != -1) b64Out.write(buffer, 0, len);
+                b64Out.close();
+                return baos.toString(StandardCharsets.UTF_8);
+            }
     }
 
     private String normalizeTime(String time){
