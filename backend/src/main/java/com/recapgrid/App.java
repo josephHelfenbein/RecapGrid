@@ -43,6 +43,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -260,7 +261,7 @@ public class App {
             JsonNode timestampsNode = structured.get(0).path("timestamps");
             if (!timestampsNode.isArray()) throw new IllegalStateException("Expected timestamps array, got: " + timestampsNode);
             
-            List<String> segmentPaths = new ArrayList<>();
+            List<Path> segmentPaths = new ArrayList<>();
 
             int i = 0;
             for(JsonNode timestampNode : timestampsNode){
@@ -271,6 +272,7 @@ public class App {
                 }
                 String start = normalizeTime(parts[0].trim());
                 String end   = normalizeTime(parts[1].trim());
+                Duration dur = parseDuration(end).minus(parseDuration(start));
                 Path seg = gcsTempDir.resolve("seg-" + (i++) + ".mp4");
                 logger.info("Creating segment {} -> {}", seg, timestampNode.asText());
 
@@ -278,8 +280,13 @@ public class App {
                     "ffmpeg", "-y",
                     "-i", originalPath.toString(),
                     "-ss", start,
-                    "-to", end,
-                    "-c", "copy",
+                    "-t", String.valueOf(dur.toSeconds()),
+                    "-c:v", "libx264",
+                    "-preset", "fast",
+                    "-crf", "23",
+                    "-c:a", "aac",
+                    "-b:a", "128k",
+                    "-movflags", "+faststart",
                     seg.toString()
                 );
                 processBuilder.inheritIO();
@@ -289,11 +296,11 @@ public class App {
                     logger.error("Error processing segment: {} - Code: {}", timestampNode.asText(), code);
                     continue;
                 }
-                segmentPaths.add(seg.toString());
+                segmentPaths.add(seg);
             }
             Path listFile = gcsTempDir.resolve("list.txt");
             try (PrintWriter writer = new PrintWriter(listFile.toFile())){
-                for(String p : segmentPaths) writer.println("file '" + p.replace("'", "\\'") + "'");
+                for(Path p : segmentPaths) writer.println("file '" + p.toString().replace("'", "\\'") + "'");
             }
             Path output = gcsTempDir.resolve("output-" + UUID.randomUUID() + ".mp4");
             ProcessBuilder concatProcessBuilder = new ProcessBuilder(
@@ -301,8 +308,8 @@ public class App {
                 "-f", "concat",
                 "-safe", "0",
                 "-i", listFile.toString(),
-                "-c:v", "libx264",
-                "-c:a", "aac",
+                "-c:v", "copy",
+                "-c:a", "copy",
                 "-movflags", "+faststart",
                 output.toString()
             );
@@ -334,6 +341,8 @@ public class App {
                         "ffmpeg", "-y",
                         "-i", output.toString(),
                         "-i", audioPath.toString(),
+                        "-filter_complex",
+                        "[0:a][1:a]amix=inputs=2:duration=longest:dropout_transition=2",
                         "-c:v", "copy",
                         "-c:a", "aac",
                         "-b:a", "192k",
@@ -386,6 +395,25 @@ public class App {
                 b64Out.close();
                 return baos.toString(StandardCharsets.UTF_8);
             }
+    }
+
+    private Duration parseDuration(String timestamp) {
+        String[] parts = timestamp.split(":");
+        try{
+            if (parts.length == 2) {
+                long m = Long.parseLong(parts[0]);
+                long s = Long.parseLong(parts[1]);
+                return Duration.ofMinutes(m).plusSeconds(s);
+            } else if (parts.length == 3) {
+                long h = Long.parseLong(parts[0]);
+                long m = Long.parseLong(parts[1]);
+                long s = Long.parseLong(parts[2]);
+                return Duration.ofHours(h).plusMinutes(m).plusSeconds(s);
+            }
+        } catch(NumberFormatException e) {
+            logger.warn("Invalid time format: {}", timestamp);
+        }
+        return Duration.ZERO;
     }
 
     private String normalizeTime(String time){
