@@ -319,11 +319,11 @@ public class App {
                 try(TextToSpeechClient tts = TextToSpeechClient.create()){
                     SynthesisInput input = SynthesisInput.newBuilder().setText(narration).build();
                     VoiceSelectionParams voiceParams = VoiceSelectionParams.newBuilder().setLanguageCode("en-US").setSsmlGender(ssmlGender).build();
-                    AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.MP3).build();
+                    AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.LINEAR16).build();
 
                     SynthesizeSpeechResponse resp = tts.synthesizeSpeech(input, voiceParams, audioConfig);
                     ByteString audioBytes = resp.getAudioContent();
-                    Path audioPath = gcsTempDir.resolve("narration.mp3");
+                    Path audioPath = gcsTempDir.resolve("narration.wav");
                     Files.createDirectories(audioPath.getParent());
                     Files.write(audioPath, audioBytes.toByteArray());
                     logger.info("Generated narration audio file: {}", audioPath);
