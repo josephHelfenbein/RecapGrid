@@ -314,17 +314,18 @@ public class App {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
             if(!voice.equalsIgnoreCase("none")){
-                String narration = structured.get(0).path("narration").asText();
+                String narration = structured.get(1).path("narration").asText();
+                logger.info("Generated narration: {}", narration);
                 SsmlVoiceGender ssmlGender = voice.equalsIgnoreCase("female") ? SsmlVoiceGender.FEMALE : voice.equalsIgnoreCase("male") ? SsmlVoiceGender.MALE : SsmlVoiceGender.NEUTRAL;
                 try(TextToSpeechClient tts = TextToSpeechClient.create()){
                     SynthesisInput input = SynthesisInput.newBuilder().setText(narration).build();
                     VoiceSelectionParams voiceParams = VoiceSelectionParams.newBuilder().setLanguageCode("en-US").setSsmlGender(ssmlGender).build();
-                    AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.LINEAR16).build();
+                    AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.LINEAR16).setSampleRateHertz(44100).build();
 
                     SynthesizeSpeechResponse resp = tts.synthesizeSpeech(input, voiceParams, audioConfig);
                     ByteString audioBytes = resp.getAudioContent();
+
                     Path audioPath = gcsTempDir.resolve("narration.wav");
-                    Files.createDirectories(audioPath.getParent());
                     Files.write(audioPath, audioBytes.toByteArray());
                     logger.info("Generated narration audio file: {}", audioPath);
 
@@ -338,9 +339,6 @@ public class App {
                         "-b:a", "192k",
                         "-ar", "44100",
                         "-movflags", "+faststart",
-                        "-map", "0:v:0",
-                        "-map", "1:a:0",
-                        "-shortest",
                         finalWithVoice.toString()
                     );
                     voiceProcessBuilder.inheritIO();
