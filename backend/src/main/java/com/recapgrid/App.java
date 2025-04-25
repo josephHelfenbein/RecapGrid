@@ -49,6 +49,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.google.cloud.texttospeech.v1.*;
+import com.google.protobuf.ByteString;
+
 @SpringBootApplication
 @RestController
 @RequestMapping("/api")
@@ -191,7 +194,7 @@ public class App {
 
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("Summarize this video for an editor.\n")
-                .append("1. First, list important timestamps where meaningful events happen (format: [start-end]).\n");
+                        .append("1. First, list important timestamps where meaningful events happen (format: [start-end]).\n");
 
             if (!voice.equalsIgnoreCase("none")) {
                 promptBuilder.append("2. Then, write a short narration in a ")
@@ -310,7 +313,44 @@ public class App {
                 logger.error("Error concatenating segments - Code: {}", concatCode);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            result = uploadProcessed(userId, output.toFile(), "processed-" + video.getFileName()); 
+            if(!voice.equalsIgnoreCase("none")){
+                String narration = structured.get(0).path("narration").asText();
+                SsmlVoiceGender ssmlGender = voice.equalsIgnoreCase("female") ? SsmlVoiceGender.FEMALE : voice.equalsIgnoreCase("male") ? SsmlVoiceGender.MALE : SsmlVoiceGender.NEUTRAL;
+                try(TextToSpeechClient tts = TextToSpeechClient.create()){
+                    SynthesisInput input = SynthesisInput.newBuilder().setText(narration).build();
+                    VoiceSelectionParams voiceParams = VoiceSelectionParams.newBuilder().setLanguageCode("en-US").setSsmlGender(ssmlGender).build();
+                    AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.MP3).build();
+
+                    SynthesizeSpeechResponse resp = tts.synthesizeSpeech(input, voiceParams, audioConfig);
+                    ByteString audioBytes = resp.getAudioContent();
+                    Path audioPath = gcsTempDir.resolve("narration.mp3");
+                    Files.createDirectories(audioPath.getParent());
+                    Files.write(audioPath, audioBytes.toByteArray());
+                    logger.info("Generated narration audio file: {}", audioPath);
+
+                    Path finalWithVoice = gcsTempDir.resolve("final-" + UUID.randomUUID() + ".mp4");
+                    ProcessBuilder voiceProcessBuilder = new ProcessBuilder(
+                        "ffmpeg", "-y",
+                        "-i", output.toString(),
+                        "-i", audioPath.toString(),
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-map", "0:v:0",
+                        "-map", "1:a:0",
+                        "-shortest",
+                        finalWithVoice.toString()
+                    );
+                    voiceProcessBuilder.inheritIO();
+                    int voiceCode = voiceProcessBuilder.start().waitFor();
+                    if (voiceCode != 0) {
+                        logger.error("Error adding voice to video - Code: {}", voiceCode);
+                        result = uploadProcessed(userId, output.toFile(), "processed-" + video.getFileName()); 
+                    }
+                    else result = uploadProcessed(userId, finalWithVoice.toFile(), "processed-" + video.getFileName());
+
+                }
+            }
+            else result = uploadProcessed(userId, output.toFile(), "processed-" + video.getFileName()); 
 
         } catch (IOException e) {
             logger.error("IO error while processing video: {}", video.getFileName(), e);
