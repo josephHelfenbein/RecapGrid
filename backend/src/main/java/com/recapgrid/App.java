@@ -201,7 +201,7 @@ public class App {
                 promptBuilder.append("2. Then, write a short narration in a ")
                             .append(feel.toLowerCase()).append(" tone ")
                             .append("to accompany these clips, spoken in a ")
-                            .append(voice.toLowerCase()).append(" voice.");
+                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration.\n");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
             ObjectMapper mapper = new ObjectMapper();
@@ -354,13 +354,13 @@ public class App {
                     int voiceCode = voiceProcessBuilder.start().waitFor();
                     if (voiceCode != 0) {
                         logger.error("Error adding voice to video - Code: {}", voiceCode);
-                        result = uploadProcessed(userId, output.toFile(), "processed-" + video.getFileName()); 
+                        result = uploadProcessed(userId, output.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
                     }
-                    else result = uploadProcessed(userId, finalWithVoice.toFile(), "processed-" + video.getFileName());
+                    else result = uploadProcessed(userId, finalWithVoice.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName());
 
                 }
             }
-            else result = uploadProcessed(userId, output.toFile(), "processed-" + video.getFileName()); 
+            else result = uploadProcessed(userId, output.toFile(), "processed-" + "-" + video.getFileName()); 
 
         } catch (IOException e) {
             logger.error("IO error while processing video: {}", video.getFileName(), e);
