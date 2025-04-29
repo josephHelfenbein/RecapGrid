@@ -30,6 +30,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriUtils;
 
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -205,7 +206,7 @@ public class App {
                 promptBuilder.append("2. Then, write a short narration in a ")
                             .append(feel.toLowerCase()).append(" tone ")
                             .append("to accompany these clips, spoken in a ")
-                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be exactly equal.\n");
+                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be exactly equal. The narration should be only for what's inside the timestamp ranges, not what's outside.\n");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
             ObjectMapper mapper = new ObjectMapper();
@@ -368,21 +369,58 @@ public class App {
                 for(Path p : segmentPaths) writer.println("file '" + p.toString().replace("'", "\\'") + "'");
             }
             Path output = gcsTempDir.resolve("output-" + UUID.randomUUID() + ".mp4");
-            ProcessBuilder concatProcessBuilder = new ProcessBuilder(
-                "ffmpeg", "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", listFile.toString(),
-                "-c:v", "copy",
-                "-c:a", "copy",
-                "-movflags", "+faststart",
-                output.toString()
-            );
-            concatProcessBuilder.inheritIO();
-            int concatCode = concatProcessBuilder.start().waitFor();
-            if (concatCode != 0) {
-                logger.error("Error concatenating segments - Code: {}", concatCode);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            if(!voice.equalsIgnoreCase("none")){
+                Path srt = gcsTempDir.resolve("captions.srt");
+                try(BufferedWriter w = Files.newBufferedWriter(srt, StandardCharsets.UTF_8)){
+                    for(int i=0; i<timestampsNode.size(); i++){
+                        String timestamp = timestampsNode.get(i).asText();
+                        String start = toSrtTime(timestamp.split("-")[0].trim());
+                        String end = toSrtTime(timestamp.split("-")[1].trim());
+                        String narration = narrationsNode.get(i).asText();
+                        w.write(Integer.toString(i+1)); w.newLine();
+                        w.write(start + " --> " + end); w.newLine();
+                        w.write(narration); w.newLine();
+                        w.newLine();
+                    }
+                }
+                ProcessBuilder concatProcessBuilder = new ProcessBuilder(
+                    "ffmpeg", "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", listFile.toString(),
+                    "-vf", "subtitles=" + srt.toString().replace(":", "\\:"),
+                    "-c:v", "libx264",
+                    "-preset", "fast",
+                    "-crf", "23",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-movflags", "+faststart",
+                    output.toString()
+                );
+                concatProcessBuilder.inheritIO();
+                int concatCode = concatProcessBuilder.start().waitFor();
+                if (concatCode != 0) {
+                    logger.error("Error concatenating segments - Code: {}", concatCode);
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
+            }
+            else{
+                ProcessBuilder concatProcessBuilder = new ProcessBuilder(
+                    "ffmpeg", "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", listFile.toString(),
+                    "-c:v", "copy",
+                    "-c:a", "copy",
+                    "-movflags", "+faststart",
+                    output.toString()
+                );
+                concatProcessBuilder.inheritIO();
+                int concatCode = concatProcessBuilder.start().waitFor();
+                if (concatCode != 0) {
+                    logger.error("Error concatenating segments - Code: {}", concatCode);
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
             }
 
             result = uploadProcessed(userId, output.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
@@ -408,6 +446,23 @@ public class App {
             }
         }
         return result;
+    }
+
+    private String toSrtTime(String ts){
+        String[] parts = ts.split(":");
+        int h, m, s;
+        if(parts.length == 2){
+            h = 0;
+            m = Integer.parseInt(parts[0]);
+            s = Integer.parseInt(parts[1]);
+        } else if(parts.length == 3){
+            h = Integer.parseInt(parts[0]);
+            m = Integer.parseInt(parts[1]);
+            s = Integer.parseInt(parts[2]);
+        } else {
+            throw new IllegalArgumentException("Invalid timestamp format: " + ts);
+        }
+        return String.format("%02d:%02d:%02d,000", h, m, s);
     }
 
     private String base64EncodeFile(Path path) throws IOException{
