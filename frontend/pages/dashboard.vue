@@ -109,6 +109,12 @@ import { SignedOut } from '@clerk/vue';
 
   const fileInput = ref(null)
 
+  useSeoMeta({
+    title: 'Dashboard',
+    description: 'Instantly turn videos into shareable highlight reels with smart timestamps, AI narration, and background music.',
+    ogTitle: 'RecapGrid - Dashboard',
+    twitterTitle: 'RecapGrid - Dashboard',
+  });
 
   async function getVideos(userId){
     const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`);

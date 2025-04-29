@@ -100,6 +100,13 @@
   import { Button } from '@/components/ui/button'
   import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
   
+  useSeoMeta({
+    title: 'Instantly Summarize & Share Your Best Video Moments',
+    description: 'Instantly turn videos into shareable highlight reels with smart timestamps, AI narration, and background music.',
+    ogTitle: 'Home',
+    twitterTitle: 'RecapGrid - Home',
+  });
+
   const features = [
     {
       icon: WandIcon,
