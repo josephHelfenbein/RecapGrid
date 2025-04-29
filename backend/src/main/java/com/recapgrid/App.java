@@ -50,6 +50,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+
 import com.google.cloud.texttospeech.v1.*;
 import com.google.protobuf.ByteString;
 
@@ -313,7 +317,7 @@ public class App {
                     try(TextToSpeechClient tts = TextToSpeechClient.create()){
                         SynthesisInput input = SynthesisInput.newBuilder().setText(narration).build();
                         VoiceSelectionParams voiceParams = VoiceSelectionParams.newBuilder().setLanguageCode("en-US").setSsmlGender(ssmlGender).build();
-                        AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.LINEAR16).setSampleRateHertz(44100).build();
+                        AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.LINEAR16).setSampleRateHertz(44100).setSpeakingRate(1.5).build();
     
                         SynthesizeSpeechResponse resp = tts.synthesizeSpeech(input, voiceParams, audioConfig);
                         ByteString audioBytes = resp.getAudioContent();
@@ -322,13 +326,29 @@ public class App {
                         Files.write(audioPath, audioBytes.toByteArray());
                         logger.info("Generated narration audio file: {}", audioPath);
 
+                        double videoLen = dur.getSeconds();
+                        AudioInputStream ais = AudioSystem.getAudioInputStream(audioPath.toFile());
+                        AudioFormat fmt = ais.getFormat();
+                        double audioLen = ais.getFrameLength() / fmt.getFrameRate();
+                        ais.close();
+                        double speedFactor = videoLen / audioLen;
+                        logger.info("Speed factor: {}", speedFactor);
+
+                        String filter = String.format(
+                            "[0:v]setpts=PTS*%f[v];" +
+                            "[0:a][1:a]amix=inputs=2:duration=first[a]",
+                            speedFactor
+                        );
+
                         Path finalSegment = gcsTempDir.resolve("final-seg-" + i + ".mp4");
                         ProcessBuilder voiceProcessBuilder = new ProcessBuilder(
                             "ffmpeg", "-y",
                             "-i", seg.toString(),
                             "-i", audioPath.toString(),
-                            "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=shortest",
-                            "-c:v", "copy",
+                            "-filter_complex", filter,
+                            "-map", "[v]",
+                            "-map", "[a]",
+                            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                             "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
                             "-movflags", "+faststart",
                             finalSegment.toString()
