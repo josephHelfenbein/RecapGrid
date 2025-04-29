@@ -278,8 +278,8 @@ public class App {
                 }
             }
 
-            int i = 0;
-            for(JsonNode timestampNode : timestampsNode){
+            for(int i = 0; i<timestampsNode.size(); i++){
+                JsonNode timestampNode = timestampsNode.get(i);
                 String[] parts = timestampNode.asText().split("-");
                 if (parts.length != 2) {
                     logger.warn("Skipping malformed timestamp: {}", timestampNode.asText());
@@ -332,13 +332,14 @@ public class App {
                         double audioLen = ais.getFrameLength() / fmt.getFrameRate();
                         ais.close();
                         double speedFactor = audioLen / videoLen;
+                        String tempoFilt  = atempoChain(speedFactor);
                         logger.info("Speed factor: {}", speedFactor);
 
                         String filter = String.format(
                             "[0:v]setpts=PTS*%f[v];" +
-                            "[0:a]atempo=%f[a0];" +
-                            "[0:a][1:a]amix=inputs=2:duration=longest[a]",
-                            speedFactor, speedFactor
+                            "[0:a]%s[a0];" +
+                            "[a0][1:a]amix=inputs=2:duration=longest:dropout_transition=2[a]",
+                            speedFactor, tempoFilt
                         );
 
                         Path finalSegment = gcsTempDir.resolve("final-seg-" + i + ".mp4");
@@ -363,7 +364,6 @@ public class App {
                         seg = finalSegment;
                     }
                 }
-                i++;
                 segmentPaths.add(seg);
             }
             Path listFile = gcsTempDir.resolve("list.txt");
@@ -412,6 +412,20 @@ public class App {
         }
         return result;
     }
+
+    private String atempoChain(double speed) {
+        List<String> parts = new ArrayList<>();
+        while (speed > 2.0) {
+            parts.add("atempo=2.0");
+            speed /= 2.0;
+        }
+        while (speed < 0.5) {
+            parts.add("atempo=0.5");
+            speed *= 2.0;
+        }
+        parts.add(String.format("atempo=%f", speed));
+        return String.join(",", parts);
+    }    
 
     private String base64EncodeFile(Path path) throws IOException{
         try(ByteArrayOutputStream baos = new ByteArrayOutputStream();
