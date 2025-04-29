@@ -200,7 +200,7 @@ public class App {
 
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("Summarize this video for an editor.\n")
-                        .append("1. First, list important timestamps where meaningful events happen (format: [start-end]).\n");
+                        .append("1. First, list important timestamps where meaningful events happen (format: [start-end]). There should be more than 1 timestamp range, and no more than 10.\n");
 
             if (!voice.equalsIgnoreCase("none")) {
                 promptBuilder.append("2. Then, write a short narration in a ")
