@@ -337,7 +337,8 @@ public class App {
                         double speedFactor = audioLen / videoLen;
                         logger.info("Speed factor: {}", speedFactor);
 
-                        newTimestamps.add(toTimestamp(start, audioLen));
+                        if(newTimestamps.size()==0) newTimestamps.add(toTimestamp("0:00", audioLen));
+                        else newTimestamps.add(toTimestamp(newTimestamps.get(newTimestamps.size()-1).split("-")[1].trim(), audioLen));
 
                         String filter = String.format(
                             "[0:v]setpts=PTS*%f[v]", 
