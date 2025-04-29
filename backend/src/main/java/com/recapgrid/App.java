@@ -332,14 +332,11 @@ public class App {
                         double audioLen = ais.getFrameLength() / fmt.getFrameRate();
                         ais.close();
                         double speedFactor = audioLen / videoLen;
-                        String tempoFilt  = atempoChain(speedFactor);
                         logger.info("Speed factor: {}", speedFactor);
 
                         String filter = String.format(
-                            "[0:v]setpts=PTS*%f[v];" +
-                            "[0:a]%s[a0];" +
-                            "[a0][1:a]amix=inputs=2:duration=longest:dropout_transition=2[a]",
-                            speedFactor, tempoFilt
+                            "[0:v]setpts=PTS*%f[v]", 
+                            speedFactor
                         );
 
                         Path finalSegment = gcsTempDir.resolve("final-seg-" + i + ".mp4");
@@ -349,7 +346,7 @@ public class App {
                             "-i", audioPath.toString(),
                             "-filter_complex", filter,
                             "-map", "[v]",
-                            "-map", "[a]",
+                            "-map", "1:a",
                             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                             "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
                             "-movflags", "+faststart",
@@ -412,20 +409,6 @@ public class App {
         }
         return result;
     }
-
-    private String atempoChain(double speed) {
-        List<String> parts = new ArrayList<>();
-        while (speed > 2.0) {
-            parts.add("atempo=2.0");
-            speed /= 2.0;
-        }
-        while (speed < 0.5) {
-            parts.add("atempo=0.5");
-            speed *= 2.0;
-        }
-        parts.add(String.format("atempo=%f", speed));
-        return String.join(",", parts);
-    }    
 
     private String base64EncodeFile(Path path) throws IOException{
         try(ByteArrayOutputStream baos = new ByteArrayOutputStream();
