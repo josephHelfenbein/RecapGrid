@@ -4,7 +4,7 @@
     <nav class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex h-16 items-center justify-between">
         <NuxtLink to="/" class="flex items-center gap-2">
-          <VideoIcon class="h-6 w-6 text-primary" />
+          <img src="/favicon.ico" alt="RecapGrid Logo" class="h-8 w-8" />
           <span class="text-xl font-bold">RecapGrid</span>
         </NuxtLink>
         <div class="flex space-x-4">

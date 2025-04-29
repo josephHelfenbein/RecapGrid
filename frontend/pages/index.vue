@@ -76,7 +76,7 @@
         <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div class="flex justify-between items-center">
             <div class="flex items-center gap-2">
-              <VideoIcon class="h-6 w-6 text-primary" />
+              <img src="/favicon.ico" alt="RecapGrid Logo" class="h-8 w-8" />
               <span class="font-semibold">RecapGrid</span>
             </div>
             <p class="text-sm text-muted-foreground">© 2025 RecapGrid. All rights reserved.</p>
