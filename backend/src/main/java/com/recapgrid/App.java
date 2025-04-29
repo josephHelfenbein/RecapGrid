@@ -201,7 +201,7 @@ public class App {
                 promptBuilder.append("2. Then, write a short narration in a ")
                             .append(feel.toLowerCase()).append(" tone ")
                             .append("to accompany these clips, spoken in a ")
-                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration.\n");
+                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be exactly equal.\n");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
             ObjectMapper mapper = new ObjectMapper();
@@ -221,7 +221,7 @@ public class App {
                             "type", "OBJECT",
                             "properties", Map.of(
                                 "timestamps", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
-                                "narration", Map.of("type", "STRING")
+                                "narration", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
                             )
                         )
                     )
@@ -263,6 +263,18 @@ public class App {
             
             List<Path> segmentPaths = new ArrayList<>();
 
+            JsonNode narrationsNode = null;
+            SsmlVoiceGender ssmlGender = voice.equalsIgnoreCase("female") ? SsmlVoiceGender.FEMALE : voice.equalsIgnoreCase("male") ? SsmlVoiceGender.MALE : SsmlVoiceGender.NEUTRAL;
+            if(!voice.equalsIgnoreCase("none")){
+                narrationsNode = structured.get(0).path("narration");
+                if (!narrationsNode.isArray()) throw new IllegalStateException("Expected narration array, got: " + narrationsNode);
+                if (narrationsNode.size() != timestampsNode.size()) {
+                    logger.error("Mismatch between timestamps and narration sizes: {} vs {}", timestampsNode.size(), narrationsNode.size());
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
+            }
+
+
             int i = 0;
             for(JsonNode timestampNode : timestampsNode){
                 String[] parts = timestampNode.asText().split("-");
@@ -271,9 +283,9 @@ public class App {
                     continue;
                 }
                 String start = normalizeTime(parts[0].trim());
-                String end   = normalizeTime(parts[1].trim());
+                String end = normalizeTime(parts[1].trim());
                 Duration dur = parseDuration(end).minus(parseDuration(start));
-                Path seg = gcsTempDir.resolve("seg-" + (i++) + ".mp4");
+                Path seg = gcsTempDir.resolve("seg-" + i + ".mp4");
                 logger.info("Creating segment {} -> {}", seg, timestampNode.asText());
 
                 ProcessBuilder processBuilder = new ProcessBuilder(
@@ -290,12 +302,48 @@ public class App {
                     seg.toString()
                 );
                 processBuilder.inheritIO();
-                Process process = processBuilder.start();
-                int code = process.waitFor();
+                int code = processBuilder.start().waitFor();
                 if (code != 0) {
                     logger.error("Error processing segment: {} - Code: {}", timestampNode.asText(), code);
                     continue;
                 }
+
+                if(!voice.equalsIgnoreCase("none")){
+                    String narration = narrationsNode.get(i).asText();
+                    logger.info("Generated narration: {}", narration);
+                    try(TextToSpeechClient tts = TextToSpeechClient.create()){
+                        SynthesisInput input = SynthesisInput.newBuilder().setText(narration).build();
+                        VoiceSelectionParams voiceParams = VoiceSelectionParams.newBuilder().setLanguageCode("en-US").setSsmlGender(ssmlGender).build();
+                        AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.LINEAR16).setSampleRateHertz(44100).build();
+    
+                        SynthesizeSpeechResponse resp = tts.synthesizeSpeech(input, voiceParams, audioConfig);
+                        ByteString audioBytes = resp.getAudioContent();
+    
+                        Path audioPath = gcsTempDir.resolve("narration" + i + ".wav");
+                        Files.write(audioPath, audioBytes.toByteArray());
+                        logger.info("Generated narration audio file: {}", audioPath);
+
+                        Path finalSegment = gcsTempDir.resolve("final-seg-" + i + ".mp4");
+                        ProcessBuilder voiceProcessBuilder = new ProcessBuilder(
+                            "ffmpeg", "-y",
+                            "-i", seg.toString(),
+                            "-i", audioPath.toString(),
+                            "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=shortest",
+                            "-c:v", "copy",
+                            "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+                            "-movflags", "+faststart",
+                            finalSegment.toString()
+                        );
+                        voiceProcessBuilder.inheritIO();
+                        int voiceCode = voiceProcessBuilder.start().waitFor();
+                        if (voiceCode != 0) {
+                            logger.error("Error adding voice to segment: {} - Code: {}", timestampNode.asText(), voiceCode);
+                            continue;
+                        }
+                        seg = finalSegment;
+                    }
+                }
+                i++;
                 segmentPaths.add(seg);
             }
             Path listFile = gcsTempDir.resolve("list.txt");
@@ -314,53 +362,13 @@ public class App {
                 output.toString()
             );
             concatProcessBuilder.inheritIO();
-            Process process = concatProcessBuilder.start();
-            int concatCode = process.waitFor();
+            int concatCode = concatProcessBuilder.start().waitFor();
             if (concatCode != 0) {
                 logger.error("Error concatenating segments - Code: {}", concatCode);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            if(!voice.equalsIgnoreCase("none")){
-                String narration = structured.get(1).path("narration").asText();
-                logger.info("Generated narration: {}", narration);
-                SsmlVoiceGender ssmlGender = voice.equalsIgnoreCase("female") ? SsmlVoiceGender.FEMALE : voice.equalsIgnoreCase("male") ? SsmlVoiceGender.MALE : SsmlVoiceGender.NEUTRAL;
-                try(TextToSpeechClient tts = TextToSpeechClient.create()){
-                    SynthesisInput input = SynthesisInput.newBuilder().setText(narration).build();
-                    VoiceSelectionParams voiceParams = VoiceSelectionParams.newBuilder().setLanguageCode("en-US").setSsmlGender(ssmlGender).build();
-                    AudioConfig audioConfig = AudioConfig.newBuilder().setAudioEncoding(AudioEncoding.LINEAR16).setSampleRateHertz(44100).build();
 
-                    SynthesizeSpeechResponse resp = tts.synthesizeSpeech(input, voiceParams, audioConfig);
-                    ByteString audioBytes = resp.getAudioContent();
-
-                    Path audioPath = gcsTempDir.resolve("narration.wav");
-                    Files.write(audioPath, audioBytes.toByteArray());
-                    logger.info("Generated narration audio file: {}", audioPath);
-
-                    Path finalWithVoice = gcsTempDir.resolve("final-" + UUID.randomUUID() + ".mp4");
-                    ProcessBuilder voiceProcessBuilder = new ProcessBuilder(
-                        "ffmpeg", "-y",
-                        "-i", output.toString(),
-                        "-i", audioPath.toString(),
-                        "-filter_complex",
-                        "[0:a][1:a]amix=inputs=2:duration=longest:dropout_transition=2",
-                        "-c:v", "copy",
-                        "-c:a", "aac",
-                        "-b:a", "192k",
-                        "-ar", "44100",
-                        "-movflags", "+faststart",
-                        finalWithVoice.toString()
-                    );
-                    voiceProcessBuilder.inheritIO();
-                    int voiceCode = voiceProcessBuilder.start().waitFor();
-                    if (voiceCode != 0) {
-                        logger.error("Error adding voice to video - Code: {}", voiceCode);
-                        result = uploadProcessed(userId, output.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
-                    }
-                    else result = uploadProcessed(userId, finalWithVoice.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName());
-
-                }
-            }
-            else result = uploadProcessed(userId, output.toFile(), "processed-" + "-" + video.getFileName()); 
+            result = uploadProcessed(userId, output.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
 
         } catch (IOException e) {
             logger.error("IO error while processing video: {}", video.getFileName(), e);
