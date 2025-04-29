@@ -279,6 +279,8 @@ public class App {
                 }
             }
 
+            ArrayList<String> newTimestamps = new ArrayList<>();
+
             for(int i = 0; i<timestampsNode.size(); i++){
                 JsonNode timestampNode = timestampsNode.get(i);
                 String[] parts = timestampNode.asText().split("-");
@@ -335,6 +337,8 @@ public class App {
                         double speedFactor = audioLen / videoLen;
                         logger.info("Speed factor: {}", speedFactor);
 
+                        newTimestamps.add(toTimestamp(start, audioLen));
+
                         String filter = String.format(
                             "[0:v]setpts=PTS*%f[v]", 
                             speedFactor
@@ -360,8 +364,9 @@ public class App {
                             continue;
                         }
                         seg = finalSegment;
-                    }
+                    } 
                 }
+                else newTimestamps.add(timestampNode.asText());
                 segmentPaths.add(seg);
             }
             Path listFile = gcsTempDir.resolve("list.txt");
@@ -372,8 +377,8 @@ public class App {
             if(!voice.equalsIgnoreCase("none")){
                 Path srt = gcsTempDir.resolve("captions.srt");
                 try(BufferedWriter w = Files.newBufferedWriter(srt, StandardCharsets.UTF_8)){
-                    for(int i=0; i<timestampsNode.size(); i++){
-                        String timestamp = timestampsNode.get(i).asText();
+                    for(int i=0; i<newTimestamps.size(); i++){
+                        String timestamp = newTimestamps.get(i);
                         String start = toSrtTime(timestamp.split("-")[0].trim());
                         String end = toSrtTime(timestamp.split("-")[1].trim());
                         String narration = narrationsNode.get(i).asText();
@@ -446,6 +451,22 @@ public class App {
             }
         }
         return result;
+    }
+
+    private String toTimestamp(String start, double duration){
+        Duration durStart = parseDuration(start);
+        long addSecs = Math.round(duration);
+        Duration durEnd = durStart.plusSeconds(addSecs);
+        return formatDuration(durStart) + "-" + formatDuration(durEnd);
+    }
+
+    private String formatDuration(Duration duration) {
+        long totalSeconds = duration.getSeconds();
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        if(hours>0) return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        return String.format("%02d:%02d", minutes, seconds);
     }
 
     private String toSrtTime(String ts){
