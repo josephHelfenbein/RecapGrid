@@ -331,13 +331,14 @@ public class App {
                         AudioFormat fmt = ais.getFormat();
                         double audioLen = ais.getFrameLength() / fmt.getFrameRate();
                         ais.close();
-                        double speedFactor = videoLen / audioLen;
+                        double speedFactor = audioLen / videoLen;
                         logger.info("Speed factor: {}", speedFactor);
 
                         String filter = String.format(
                             "[0:v]setpts=PTS*%f[v];" +
-                            "[0:a][1:a]amix=inputs=2:duration=first[a]",
-                            speedFactor
+                            "[0:a]atempo=%f[a0];" +
+                            "[0:a][1:a]amix=inputs=2:duration=longest[a]",
+                            speedFactor, speedFactor
                         );
 
                         Path finalSegment = gcsTempDir.resolve("final-seg-" + i + ".mp4");

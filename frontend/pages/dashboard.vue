@@ -66,8 +66,8 @@
               <CardHeader>
                 <video class="w-full h-36 object-cover rounded-lg" :src="video.fileUrl" controls></video>
                 <div class="flex items-center justify-between mt-4">
-                  <div>
-                    <CardTitle>{{ video.fileName }}</CardTitle>
+                  <div class="flex-1 min-w-0">
+                    <CardTitle class="truncate">{{ video.fileName }}</CardTitle>
                     <p class="text-foreground text-xs">Processed on {{ new Date(video.uploadedAt).toLocaleDateString() }}</p>
                   </div>
                   <Button variant="secondary" size="sm" @click="downloadVideo(video.fileUrl, video.fileName)">Download</Button>
