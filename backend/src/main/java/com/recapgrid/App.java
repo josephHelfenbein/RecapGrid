@@ -191,13 +191,6 @@ public class App {
             }
             logger.info("Saved original video to GCS temp: {}", originalPath);
 
-            String base64Video = base64EncodeFile(originalPath);
-            logger.info("Encoded video to Base64");
-            if (base64Video == null) {
-                logger.error("Failed to encode video to Base64.");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-            }
-
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("Summarize this video for an editor.\n")
                         .append("1. First, list important timestamps where meaningful events happen (format: [start-end]). There should be more than 1 timestamp range, and no more than 6.\n");
@@ -210,38 +203,52 @@ public class App {
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
             ObjectMapper mapper = new ObjectMapper();
-            Map<String, Object> requestBody = Map.of(
-                "contents", List.of(Map.of("parts", List.of(
-                    Map.of("text", promptBuilder.toString()),
-                    Map.of("inline_data", Map.of(
-                        "mime_type", "video/mp4",
-                        "data", base64Video
-                    ))
-                ))),
-                "generationConfig", Map.of(
-                    "response_mime_type", "application/json",
-                    "response_schema", Map.of(
-                        "type", "ARRAY",
-                        "items", Map.of(
-                            "type", "OBJECT",
-                            "properties", Map.of(
-                                "timestamps", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
-                                "narration", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
-                            )
+            Map<String, Object> generationConfig = Map.of(
+                "response_mime_type", "application/json",
+                "response_schema", Map.of(
+                    "type", "ARRAY",
+                    "items", Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                            "timestamps", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
+                            "narration", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
                         )
                     )
                 )
             );
 
-            String requestJson = mapper.writeValueAsString(requestBody);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> entity = new HttpEntity<>(requestJson, headers);
-
             String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
             RestTemplate restTemplate = new RestTemplate();
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+
+            ResponseEntity<String> response = restTemplate.execute(
+                url, 
+                HttpMethod.POST, 
+                request -> {
+                    request.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+                    OutputStream out = request.getBody();
+                    String prefix = 
+                        "{\"contents\":[{\"parts\":["
+                        + "{\"text\":" + mapper.writeValueAsString(promptBuilder.toString()) + "},"
+                        + "{\"inline_data\":{\"mime_type\":\"video/mp4\",\"data\":\"";
+                    out.write(prefix.getBytes(StandardCharsets.UTF_8));
+                    try(InputStream fin = Files.newInputStream(originalPath);
+                    OutputStream b64 = Base64.getEncoder().wrap(out)) {
+                        byte[] buf = new byte[16_384];
+                        int r;
+                        while((r = fin.read(buf)) > 0) b64.write(buf, 0, r);
+                        b64.flush();
+                    }
+                    String suffix = "\"}}]}],"
+                        + "\"generationConfig\":"
+                        + mapper.writeValueAsString(generationConfig)
+                        + "}";
+                    out.write(suffix.getBytes(StandardCharsets.UTF_8));
+                }, 
+                clientResponse -> {
+                    String body = new String(clientResponse.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                    return new ResponseEntity<>(body, clientResponse.getHeaders(), clientResponse.getStatusCode());
+                }
+            );
 
             if (!response.getStatusCode().is2xxSuccessful()) {
                 logger.error("Error processing video: {} - Status: {}, Response: {}", video.getFileName(), response.getStatusCode(), response.getBody());
@@ -255,13 +262,13 @@ public class App {
             }
             logger.info("Received response from Gemini");
 
-            mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(responseBody);
+            ObjectMapper readMapper = new ObjectMapper();
+            JsonNode root = readMapper.readTree(responseBody);
 
             JsonNode partsNode = root.path("candidates").get(0).path("content").path("parts");
             String textContent = partsNode.get(0).path("text").asText();
 
-            ArrayNode structured = (ArrayNode) mapper.readTree(textContent);
+            ArrayNode structured = (ArrayNode) readMapper.readTree(textContent);
 
             JsonNode timestampsNode = structured.get(0).path("timestamps");
             if (!timestampsNode.isArray()) throw new IllegalStateException("Expected timestamps array, got: " + timestampsNode);
@@ -486,19 +493,7 @@ public class App {
         }
         return String.format("%02d:%02d:%02d,000", h, m, s);
     }
-
-    private String base64EncodeFile(Path path) throws IOException{
-        try(ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            OutputStream b64Out = Base64.getEncoder().wrap(baos);
-            InputStream in = Files.newInputStream(path, StandardOpenOption.READ)){
-                byte[] buffer = new byte[8 * 1024];
-                int len;
-                while((len = in.read(buffer)) != -1) b64Out.write(buffer, 0, len);
-                b64Out.close();
-                return baos.toString(StandardCharsets.UTF_8);
-            }
-    }
-
+    
     private Duration parseDuration(String timestamp) {
         String[] parts = timestamp.split(":");
         try{
@@ -535,21 +530,6 @@ public class App {
             logger.warn("Invalid time format: {}", time);
         }
         return time;
-    }
-
-    public byte[] downloadVideo(String fileUrl) throws IOException {
-        URL url = new URL(fileUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        logger.info("Downloading video from URL: {}", fileUrl);
-
-        try (InputStream inputStream = connection.getInputStream();
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1)  outputStream.write(buffer, 0, bytesRead);
-            return outputStream.toByteArray();
-        }
     }
 
     private ResponseEntity<Processed> uploadProcessed(
