@@ -266,14 +266,13 @@ public class App {
             JsonNode narrationsNode = null;
             SsmlVoiceGender ssmlGender = voice.equalsIgnoreCase("female") ? SsmlVoiceGender.FEMALE : voice.equalsIgnoreCase("male") ? SsmlVoiceGender.MALE : SsmlVoiceGender.NEUTRAL;
             if(!voice.equalsIgnoreCase("none")){
-                narrationsNode = structured.get(0).path("narration");
+                narrationsNode = structured.get(1).path("narration");
                 if (!narrationsNode.isArray()) throw new IllegalStateException("Expected narration array, got: " + narrationsNode);
                 if (narrationsNode.size() != timestampsNode.size()) {
                     logger.error("Mismatch between timestamps and narration sizes: {} vs {}", timestampsNode.size(), narrationsNode.size());
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
                 }
             }
-
 
             int i = 0;
             for(JsonNode timestampNode : timestampsNode){
