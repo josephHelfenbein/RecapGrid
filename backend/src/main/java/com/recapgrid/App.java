@@ -33,6 +33,7 @@ import org.springframework.web.util.UriUtils;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -231,12 +232,19 @@ public class App {
                         + "{\"text\":" + mapper.writeValueAsString(promptBuilder.toString()) + "},"
                         + "{\"inline_data\":{\"mime_type\":\"video/mp4\",\"data\":\"";
                     out.write(prefix.getBytes(StandardCharsets.UTF_8));
-                    try(InputStream fin = Files.newInputStream(originalPath);
-                    OutputStream b64 = Base64.getEncoder().wrap(out)) {
+
+                    OutputStream b64Out = new FilterOutputStream(Base64.getEncoder().wrap(out)){
+                        @Override
+                        public void close() throws IOException {
+                            super.flush();
+                        }
+                    };
+                    
+                    try(InputStream fin = Files.newInputStream(originalPath)) {
                         byte[] buf = new byte[16_384];
                         int r;
-                        while((r = fin.read(buf)) > 0) b64.write(buf, 0, r);
-                        b64.flush();
+                        while((r = fin.read(buf)) > 0) b64Out.write(buf, 0, r);
+                        b64Out.flush();
                     }
                     String suffix = "\"}}]}],"
                         + "\"generationConfig\":"
@@ -493,7 +501,7 @@ public class App {
         }
         return String.format("%02d:%02d:%02d,000", h, m, s);
     }
-    
+
     private Duration parseDuration(String timestamp) {
         String[] parts = timestamp.split(":");
         try{
