@@ -46,6 +46,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.text.Normalizer;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -609,6 +610,13 @@ public class App {
         }
     }
 
+    public static String sanitize(String input) {
+        if (input == null) return "";
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+        String noAccents = normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        String safe = noAccents.replaceAll("[^A-Za-z0-9._-]", "_");
+        return safe.replaceAll("_+", "_");
+    }
     
     @PostMapping("/videos/upload")
     public ResponseEntity<Video> uploadVideo(
@@ -616,12 +624,13 @@ public class App {
         @RequestParam("fileData") MultipartFile fileData,
         @RequestParam("fileName") String fileName) {
         
-        logger.info("Uploading video '{}' for user: {}", fileName, userId);
+        String safeName = sanitize(fileName);
+        logger.info("Uploading video '{}' with name '{}' for user: {}", fileName, safeName, userId);
         ensureUserFolderExists(userId, "videos");
 
         String uploadUrl = UriComponentsBuilder
             .fromHttpUrl(supabaseUrl)
-            .pathSegment("storage", "v1", "object", "videos", userId, fileName)
+            .pathSegment("storage", "v1", "object", "videos", userId, safeName)
             .build()
             .encode()
             .toUriString();
@@ -639,17 +648,17 @@ public class App {
             if (response.getStatusCode().is2xxSuccessful()) {
                 String publicUrl = UriComponentsBuilder
                     .fromHttpUrl(supabaseUrl)
-                    .pathSegment("storage", "v1", "object", "public", "videos", userId, fileName)
+                    .pathSegment("storage", "v1", "object", "public", "videos", userId, safeName)
                     .build()
                     .encode()
                     .toUriString();
                 
-                Video saving = new Video(userId, fileName, publicUrl);
+                Video saving = new Video(userId, safeName, publicUrl);
                 videoRepository.save(saving);
                 logger.info("Video uploaded successfully: {}", publicUrl);
                 return ResponseEntity.ok(saving);
             } else {
-                logger.error("Error uploading video '{}', Status: {}, Response: {}", fileName, response.getStatusCode(), response.getBody());
+                logger.error("Error uploading video '{}', Status: {}, Response: {}", safeName, response.getStatusCode(), response.getBody());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
         } catch (Exception e) {
