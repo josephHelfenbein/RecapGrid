@@ -213,9 +213,6 @@
     showAlert.value = true;
     alertVar.value.info = message;
     alertVar.value.stage = stage;
-    setTimeout(() => {
-      showError.value = false;
-    }, 4000);
   }
 
   const uploadVideo = async (file) => {

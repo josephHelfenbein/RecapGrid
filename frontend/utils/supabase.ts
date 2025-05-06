@@ -4,10 +4,10 @@ export default defineNuxtPlugin(() => {
     const supabaseUrl = config.public.supabaseUrl!.toString();
     const supabaseKey = config.public.supabaseKey!.toString();
   
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const $supabase = createClient(supabaseUrl, supabaseKey);
     return {
       provide: {
-        supabase,
+        $supabase,
       },
     };
   });
