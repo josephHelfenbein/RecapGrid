@@ -12,8 +12,8 @@ public class StatusEntity {
     @Id
     private String id;
     
-    @Column(name = "created_at")
-    private OffsetDateTime createdAt;
+    @Column(name = "updated_at")
+    private OffsetDateTime updatedAt;
 
     @Column(name = "stage")
     private String stage;
@@ -30,11 +30,11 @@ public class StatusEntity {
         this.id = id;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
     }
-    public void setCreatedAt(OffsetDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setUpdatedAt(OffsetDateTime createdAt) {
+        this.updatedAt = createdAt;
     }
 
     public String getStage() {

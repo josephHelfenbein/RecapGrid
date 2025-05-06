@@ -631,15 +631,17 @@ public class App {
 
     private void updateInfo(String userId, String info, String stage){
         if(statusRepository.findById(userId).isPresent()){
-            StatusEntity status = statusRepository.findByUserId(userId);
-            status.setInfo(info);
-            status.setStage(stage);
-            statusRepository.save(status);
+            Optional<StatusEntity> status = statusRepository.findById(userId);
+            if(status.isEmpty()) return;
+            status.get().setUpdatedAt(OffsetDateTime.now());
+            status.get().setInfo(info);
+            status.get().setStage(stage);
+            statusRepository.save(status.get());
             return;
         }
         StatusEntity status = new StatusEntity();
         status.setId(userId);
-        status.setCreatedAt(OffsetDateTime.now());
+        status.setUpdatedAt(OffsetDateTime.now());
         status.setStage(stage);
         status.setInfo(info);
         statusRepository.save(status);
