@@ -28,6 +28,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
 import java.io.BufferedWriter;
@@ -618,9 +619,12 @@ public class App {
         logger.info("Uploading video '{}' for user: {}", fileName, userId);
         ensureUserFolderExists(userId, "videos");
 
-        String encodedFileName = UriUtils.encodePath(fileName, StandardCharsets.UTF_8);
-        String storagePath = "videos/" + userId + "/" + encodedFileName;
-        String uploadUrl = supabaseUrl + "/storage/v1/object/" + storagePath;
+        String uploadUrl = UriComponentsBuilder
+            .fromHttpUrl(supabaseUrl)
+            .pathSegment("storage", "v1", "object", "videos", userId, fileName)
+            .build()
+            .encode()
+            .toUriString();
 
         HttpHeaders headers = createHeaders();
         headers.set("Content-Type", fileData.getContentType());
@@ -633,10 +637,16 @@ public class App {
             ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
-                String fileUrl = supabaseUrl + "/storage/v1/object/public/" + storagePath;
-                Video saving = new Video(userId, fileName, fileUrl);
+                String publicUrl = UriComponentsBuilder
+                    .fromHttpUrl(supabaseUrl)
+                    .pathSegment("storage", "v1", "object", "public", "videos", userId, fileName)
+                    .build()
+                    .encode()
+                    .toUriString();
+                
+                Video saving = new Video(userId, fileName, publicUrl);
                 videoRepository.save(saving);
-                logger.info("Video uploaded successfully: {}", fileUrl);
+                logger.info("Video uploaded successfully: {}", publicUrl);
                 return ResponseEntity.ok(saving);
             } else {
                 logger.error("Error uploading video '{}', Status: {}, Response: {}", fileName, response.getStatusCode(), response.getBody());

@@ -147,6 +147,22 @@ import { SignedOut } from '@clerk/vue';
   };
 
   const uploadVideo = async (file) => {
+    if(file.size > 50 * 1024 * 1024) {
+      alert("File size exceeds 50MB limit.");
+      return;
+    }
+    if(file.type !== "video/mp4") {
+      alert("Only MP4 files are supported.");
+      return;
+    }
+    if(!user.value) {
+      alert("Please log in to upload videos.");
+      return;
+    }
+    if(!file) {
+      alert("No file selected.");
+      return;
+    }
     const formData = new FormData();
     formData.append("fileData", file);
     formData.append("fileName", file.name);
