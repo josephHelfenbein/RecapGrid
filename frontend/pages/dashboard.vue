@@ -4,6 +4,26 @@
         <RedirectToSignUp />
       </SignedOut>
       <main class="flex-1 overflow-auto">
+        <transition
+          enter-active-class="transition ease-out duration-300"
+          enter-from-class="opacity-0 translate-y-2"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition ease-in duration-200"
+          leave-from-class="opacity-100 translate-y-0"
+          leave-to-class="opacity-0 translate-y-2"
+        >
+            <Alert v-if="showError" class="fixed bottom-0 z-50 m-5 w-full max-w-md animate-fade-up">
+              <AlertTitle class="flex items-center">
+                <FileWarningIcon class="h-6 w-6 mr-2" />
+                Heads up!</AlertTitle>
+              <AlertDescription class="flex items-center">
+                <p class="truncate">{{ errorMessage }}</p>
+                <Button variant="secondary" class="absolute top-2 right-2 bg-color-none" @click="showError = false">
+                  <XIcon class="h-4 w-4" />
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </transition>
         <div class="w-screen flex justify-center">
         <div class="container max-w-4xl py-6">
           <Card class="mb-6">
@@ -46,7 +66,7 @@
                 <video class="w-full h-36 object-cover rounded-lg" :src="video.fileUrl" controls></video>
                 <div class="flex items-center justify-between mt-4">
                   <div>
-                    <CardTitle>{{ video.fileName }}</CardTitle>
+                    <CardTitle class="truncate">{{ video.fileName }}</CardTitle>
                     <p class="text-foreground text-xs">Uploaded on {{ new Date(video.uploadedAt).toLocaleDateString() }}</p>
                   </div>
                   <Button variant="secondary" size="sm" @click="processVideo(video)">Process</Button>
@@ -91,13 +111,16 @@
     SettingsIcon,
     BellIcon,
     UploadCloudIcon,
-    Wand2Icon
+    Wand2Icon,
+    XIcon,
+    FileWarningIcon,
   } from 'lucide-vue-next'
   import Loader from '@/components/Loader.vue'
   import ProcessWindow from '@/components/ProcessWindow.vue'
+  import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
   import { ref } from 'vue'
-import { SignedOut } from '@clerk/vue';
+  import { SignedOut } from '@clerk/vue';
 
   const { user } = useUser();
   const videoPopup = ref(null)
@@ -106,6 +129,8 @@ import { SignedOut } from '@clerk/vue';
   const loadedVideos = ref(false);
   const loadedPending = ref(false);
   const fileToProcess = ref(null);
+  const showError = ref(false);
+  const errorMessage = ref('');
 
   const fileInput = ref(null)
 
@@ -146,21 +171,29 @@ import { SignedOut } from '@clerk/vue';
     fileInput.value.click();
   };
 
+  const alertNew = (message) =>{
+    showError.value = true;
+    errorMessage.value = message;
+    setTimeout(() => {
+      showError.value = false;
+    }, 4000);
+  }
+
   const uploadVideo = async (file) => {
     if(file.size > 50 * 1024 * 1024) {
-      alert("File size exceeds 50MB limit.");
+      alertNew("File size exceeds 50MB limit.");
       return;
     }
     if(file.type !== "video/mp4") {
-      alert("Only MP4 files are supported.");
+      alertNew("Only MP4 files are supported.");
       return;
     }
     if(!user.value) {
-      alert("Please log in to upload videos.");
+      alertNew("Please log in to upload videos.");
       return;
     }
     if(!file) {
-      alert("No file selected.");
+      alertNew("No file selected.");
       return;
     }
     const formData = new FormData();
@@ -179,7 +212,7 @@ import { SignedOut } from '@clerk/vue';
       const data = await response.json();
       pendingVideos.value.push(data);
     } catch (error) {
-      console.error("Error uploading video:", error);
+      alertNew("Error uploading video:", error);
     }
   };
 
@@ -198,8 +231,6 @@ import { SignedOut } from '@clerk/vue';
   }
 
   const handleProcessing = async (data) =>{
-    console.log(data);
-    console.log(fileToProcess.value);
     const queryParams = new URLSearchParams({
       voice: data.voice,
       feel: data.feel,
@@ -221,7 +252,7 @@ import { SignedOut } from '@clerk/vue';
       const data = await response.json();
       videos.value.push(data);
     } catch (error) {
-      console.error("Error processing video:", error);
+      alertNew("Error processing video:", error);
     }
   }
 
