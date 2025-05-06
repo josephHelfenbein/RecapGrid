@@ -24,6 +24,26 @@
               </AlertDescription>
             </Alert>
           </transition>
+          <transition
+            enter-active-class="transition ease-out duration-300"
+            enter-from-class="opacity-0 translate-y-2"
+            enter-to-class="opacity-100 translate-y-0"
+            leave-active-class="transition ease-in duration-200"
+            leave-from-class="opacity-100 translate-y-0"
+            leave-to-class="opacity-0 translate-y-2"
+          >
+            <Alert v-if="showAlert" class="fixed bottom-0 z-50 m-5 w-full max-w-md animate-fade-up">
+              <AlertTitle class="flex items-center">
+                <BellIcon class="h-6 w-6 mr-2" />
+                {{ alertVar.stage }}</AlertTitle>
+              <AlertDescription class="flex items-center">
+                <p class="truncate">{{ alertVar.info }}</p>
+                <Button variant="secondary" class="absolute top-2 right-2 bg-color-none" @click="showError = false">
+                  <XIcon class="h-4 w-4" />
+                </Button>
+              </AlertDescription>
+            </Alert>
+          </transition>
         <div class="w-screen flex justify-center">
         <div class="container max-w-4xl py-6">
           <Card class="mb-6">
@@ -132,7 +152,14 @@
   const showError = ref(false);
   const errorMessage = ref('');
 
+  const { $supabase } = useNuxtApp();
+
   const fileInput = ref(null)
+  const showAlert = ref(false);
+  const alertVar = ref({
+    stage: '',
+    info: ''
+  });
 
   useSeoMeta({
     title: 'Dashboard',
@@ -174,6 +201,15 @@
   const alertNew = (message) =>{
     showError.value = true;
     errorMessage.value = message;
+    setTimeout(() => {
+      showError.value = false;
+    }, 4000);
+  }
+
+  const alertNewVar = (message, stage) =>{
+    showAlert.value = true;
+    alertVar.value.info = message;
+    alertVar.value.stage = stage;
     setTimeout(() => {
       showError.value = false;
     }, 4000);
@@ -260,6 +296,16 @@
     if(newUser){
       await getVideos(newUser.id);
       await getPending(newUser.id);
+      const subscription = $supabase
+        .from('status')
+        .on('UPDATE', (payload) =>{
+          console.log('Status updated:', payload.new)
+          alertNewVar(payload.new.info, payload.new.stage);
+        })
+        .subscribe();
+      onBeforeUnmount(() => {
+        $supabase.removeSubscription(subscription);
+      });
     }
   });
 

@@ -7,6 +7,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: "https://recapgrid-backend-378320393490.us-central1.run.app",
+      supabaseUrl: process.env.SUPABASE_URL,
+      supabaseKey: process.env.SUPABASE_KEY,
     },
   },
   compatibilityDate: '2024-11-01',
