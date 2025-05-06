@@ -138,8 +138,10 @@
   import Loader from '@/components/Loader.vue'
   import ProcessWindow from '@/components/ProcessWindow.vue'
   import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+  
 
-  import { ref } from 'vue'
+  import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+  import { useNuxtApp } from '#app'
   import { SignedOut } from '@clerk/vue';
 
   const { user } = useUser();
@@ -153,6 +155,7 @@
   const errorMessage = ref('');
 
   const { $supabase } = useNuxtApp();
+  let channel = null
 
   const fileInput = ref(null)
   const showAlert = ref(false);
@@ -296,17 +299,33 @@
     if(newUser){
       await getVideos(newUser.id);
       await getPending(newUser.id);
-      const subscription = $supabase
-        .from('status')
-        .on('UPDATE', (payload) =>{
-          console.log('Status updated:', payload.new)
-          alertNewVar(payload.new.info, payload.new.stage);
-        })
-        .subscribe();
-      onBeforeUnmount(() => {
-        $supabase.removeSubscription(subscription);
+      if (channel) {
+        await $supabase.removeChannel(channel)
+        channel = null
+      }
+      channel = $supabase
+      .channel(`public:status:${newUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'status',
+          filter: `id=eq.${newUser.id}`,
+        },
+        (payload) => {
+          console.log('New status:', payload.new)
+          alertNewVar(payload.new.info, payload.new.stage)
+        }
+      )
+      .subscribe((status) => {
+        console.log('Status channel subscribe status ', status)
       });
     }
+  }, { immediate: true });
+  onBeforeUnmount(() => {
+    if(channel) $supabase.removeChannel(subscription);
+    channel = null
   });
 
   </script>
