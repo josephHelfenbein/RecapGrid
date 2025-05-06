@@ -6,9 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.Processed;
+import com.recapgrid.model.StatusEntity;
 import com.recapgrid.model.UserEntity;
 import com.recapgrid.repository.VideoRepository;
 import com.recapgrid.repository.ProcessedRepository;
+import com.recapgrid.repository.StatusRepository;
 import com.recapgrid.repository.UserRepository;
 
 import java.util.ArrayList;
@@ -85,6 +87,9 @@ public class App {
 
     @Autowired
     private ProcessedRepository processedRepository;
+
+    @Autowired
+    private StatusRepository statusRepository;
 
     private RestTemplate restTemplate = new RestTemplate();
 
@@ -180,12 +185,15 @@ public class App {
         Path gcsTempDir = Paths.get("/mnt/gcs", "temp", userId, UUID.randomUUID().toString());
         ResponseEntity<Processed> result;
         try {
+            updateInfo(userId, "Creating temp directory...", "Processing video...");
+
             Files.createDirectories(gcsTempDir);
             logger.info("Created temporary directory: {}", gcsTempDir.toAbsolutePath());
             Path originalPath = gcsTempDir.resolve("orig-" + UUID.randomUUID() + ".mp4");
             logger.info("Temporary original video path: {}", originalPath.toAbsolutePath());
 
             logger.info("Downloading video to: {}", originalPath);
+            updateInfo(userId, "Downloading video to temp storage...", "Processing video...");
             try (InputStream in = new URL(video.getFileUrl()).openStream();
                 OutputStream out = Files.newOutputStream(originalPath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
                 byte[] buf = new byte[8192];
@@ -194,6 +202,7 @@ public class App {
             }
             logger.info("Saved original video to GCS temp: {}", originalPath);
 
+            updateInfo(userId, "Compressing original video...", "Processing video...");
             Path compressedOriginal = gcsTempDir.resolve("compressed-orig-" + UUID.randomUUID() + ".mp4");
             ProcessBuilder initialCompressBuilder = new ProcessBuilder(
                 "ffmpeg", "-y",
@@ -214,6 +223,8 @@ public class App {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
             logger.info("Compressed original video to: {}", compressedOriginal);
+
+            updateInfo(userId, "Generating video summary...", "Processing video...");
 
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("Summarize this video for an editor.\n")
@@ -281,6 +292,8 @@ public class App {
                 }
             );
 
+            updateInfo(userId, "Parsing AI response...", "Processing video...");
+
             if (!response.getStatusCode().is2xxSuccessful()) {
                 logger.error("Error processing video: {} - Status: {}, Response: {}", video.getFileName(), response.getStatusCode(), response.getBody());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
@@ -320,6 +333,7 @@ public class App {
             ArrayList<String> newTimestamps = new ArrayList<>();
 
             for(int i = 0; i<timestampsNode.size(); i++){
+                updateInfo(userId, "Processing segment " + (i+1) + " of " + timestampsNode.size(), "Processing video...");
                 JsonNode timestampNode = timestampsNode.get(i);
                 String[] parts = timestampNode.asText().split("-");
                 if (parts.length != 2) {
@@ -353,6 +367,7 @@ public class App {
                 }
 
                 if(!voice.equalsIgnoreCase("none")){
+                    updateInfo(userId, "Generating narration for segment " + (i+1) + " of " + timestampsNode.size(), "Processing video...");
                     String narration = narrationsNode.get(i).asText();
                     logger.info("Generated narration: {}", narration);
                     try(TextToSpeechClient tts = TextToSpeechClient.create()){
@@ -382,7 +397,8 @@ public class App {
                             "[0:v]setpts=PTS*%f[v]", 
                             speedFactor
                         );
-
+                        
+                        updateInfo(userId, "Adding narration to segment " + (i+1) + " of " + timestampsNode.size(), "Processing video...");
                         Path finalSegment = gcsTempDir.resolve("final-seg-" + i + ".mp4");
                         ProcessBuilder voiceProcessBuilder = new ProcessBuilder(
                             "ffmpeg", "-y",
@@ -408,6 +424,7 @@ public class App {
                 else newTimestamps.add(timestampNode.asText());
                 segmentPaths.add(seg);
             }
+            updateInfo(userId, "Concatenating segments...", "Processing video...");
             Path listFile = gcsTempDir.resolve("list.txt");
             try (PrintWriter writer = new PrintWriter(listFile.toFile())){
                 for(Path p : segmentPaths) writer.println("file '" + p.toString().replace("'", "\\'") + "'");
@@ -466,7 +483,7 @@ public class App {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
                 }
             }
-
+            updateInfo(userId, "Uploading processed video...", "Processing video...");
             result = uploadProcessed(userId, output.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
 
         } catch (IOException e) {
@@ -476,6 +493,7 @@ public class App {
             logger.error("Error while processing video: {}", video.getFileName(), e);
             result = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         } finally {
+            updateInfo(userId, "Cleaning up temp files...", "Processing video...");
             try {
                 Files.walk(gcsTempDir).sorted(Comparator.reverseOrder()).forEach(p->{
                     try{
@@ -489,6 +507,7 @@ public class App {
                 logger.error("Error cleaning up temp directory: {}", gcsTempDir, e);
             }
         }
+        updateInfo(userId, "", "Video processed successfully");
         return result;
     }
 
@@ -610,6 +629,22 @@ public class App {
         }
     }
 
+    private void updateInfo(String userId, String info, String stage){
+        if(statusRepository.findById(userId).isPresent()){
+            StatusEntity status = statusRepository.findByUserId(userId);
+            status.setInfo(info);
+            status.setStage(stage);
+            statusRepository.save(status);
+            return;
+        }
+        StatusEntity status = new StatusEntity();
+        status.setId(userId);
+        status.setCreatedAt(OffsetDateTime.now());
+        status.setStage(stage);
+        status.setInfo(info);
+        statusRepository.save(status);
+    }
+
     public static String sanitize(String input) {
         if (input == null) return "";
         String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
@@ -627,6 +662,8 @@ public class App {
         String safeName = sanitize(fileName);
         logger.info("Uploading video '{}' with name '{}' for user: {}", fileName, safeName, userId);
         ensureUserFolderExists(userId, "videos");
+
+        updateInfo(userId, "", "Uploading video...");
 
         String uploadUrl = UriComponentsBuilder
             .fromHttpUrl(supabaseUrl)
@@ -646,6 +683,7 @@ public class App {
             ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
+                updateInfo(userId, "", "Video uploaded successfully");
                 String publicUrl = UriComponentsBuilder
                     .fromHttpUrl(supabaseUrl)
                     .pathSegment("storage", "v1", "object", "public", "videos", userId, safeName)
