@@ -192,6 +192,27 @@ public class App {
             }
             logger.info("Saved original video to GCS temp: {}", originalPath);
 
+            Path compressedOriginal = gcsTempDir.resolve("compressed-orig-" + UUID.randomUUID() + ".mp4");
+            ProcessBuilder initialCompressBuilder = new ProcessBuilder(
+                "ffmpeg", "-y",
+                "-i", originalPath.toString(),
+                "-vf", "scale=640:-2",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-crf", "30",
+                "-c:a", "aac",
+                "-b:a", "64k",
+                "-movflags", "+faststart",
+                compressedOriginal.toString()
+            );
+            initialCompressBuilder.inheritIO();
+            int compressCode = initialCompressBuilder.start().waitFor();
+            if (compressCode != 0) {
+                logger.error("Error compressing original video - Code: {}", compressCode);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+            logger.info("Compressed original video to: {}", compressedOriginal);
+
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("Summarize this video for an editor.\n")
                         .append("1. First, list important timestamps where meaningful events happen (format: [start-end]). There should be more than 1 timestamp range, and no more than 6.\n");
@@ -240,7 +261,7 @@ public class App {
                         }
                     };
                     
-                    try(InputStream fin = Files.newInputStream(originalPath)) {
+                    try(InputStream fin = Files.newInputStream(compressedOriginal)) {
                         byte[] buf = new byte[16_384];
                         int r;
                         while((r = fin.read(buf)) > 0) b64Out.write(buf, 0, r);
@@ -311,12 +332,12 @@ public class App {
 
                 ProcessBuilder processBuilder = new ProcessBuilder(
                     "ffmpeg", "-y",
-                    "-i", originalPath.toString(),
+                    "-i", compressedOriginal.toString(),
                     "-ss", start,
                     "-t", String.valueOf(dur.toSeconds()),
                     "-c:v", "libx264",
-                    "-preset", "fast",
-                    "-crf", "23",
+                    "-preset", "ultrafast",
+                    "-crf", "30",
                     "-c:a", "aac",
                     "-b:a", "128k",
                     "-movflags", "+faststart",
@@ -368,7 +389,7 @@ public class App {
                             "-filter_complex", filter,
                             "-map", "[v]",
                             "-map", "1:a",
-                            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30",
                             "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
                             "-movflags", "+faststart",
                             finalSegment.toString()
