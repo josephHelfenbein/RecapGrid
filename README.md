@@ -36,6 +36,7 @@
 <h3 align="center">RecapGrid</h3>
 
   <p align="center">
+(Work in Progress)
 
 RecapGrid is an AI‑powered video summarization toolkit that transforms any MP4 into a ready‑to‑share highlight reel. It automatically detects key moments, extracts timestamped clips, generates synchronized AI narration with background music, and stitches everything together—delivering concise, engaging summaries with a single API call.
 <br />
