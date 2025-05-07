@@ -503,11 +503,11 @@ public class App {
                     }
                 });
                 logger.info("Cleaned up temp directory: {}", gcsTempDir);
+                updateInfo(userId, "", "Video processed successfully");
             } catch (IOException e){
                 logger.error("Error cleaning up temp directory: {}", gcsTempDir, e);
             }
         }
-        updateInfo(userId, "", "Video processed successfully");
         return result;
     }
 

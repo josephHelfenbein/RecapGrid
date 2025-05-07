@@ -38,7 +38,7 @@
                 {{ alertVar.stage }}</AlertTitle>
               <AlertDescription class="flex items-center">
                 <p class="truncate">{{ alertVar.info }}</p>
-                <Button variant="secondary" class="absolute top-2 right-2 bg-color-none" @click="showError = false">
+                <Button variant="secondary" class="absolute top-2 right-2 bg-color-none" @click="showAlert = false">
                   <XIcon class="h-4 w-4" />
                 </Button>
               </AlertDescription>
