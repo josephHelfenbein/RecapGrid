@@ -203,6 +203,6 @@ Distributed under the Apache 2.0 License. See `LICENSE.txt` for more information
 [Supabase]: https://img.shields.io/badge/supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white
 [Supabase-url]: https://supabase.com/
 [GoogleCloudRun]: https://img.shields.io/badge/google%20cloud%20run-4285F4?style=for-the-badge&logo=google%20cloud&logoColor=white
-[GoogleCloudRun-url]: https://pusher.com/
+[GoogleCloudRun-url]: https://cloud.google.com/run
 [GoogleCloudStorage]: https://img.shields.io/badge/google%20cloud%20storage-4285F4?logo=google%20cloud%20storage&style=for-the-badge&logoColor=white
-[GoogleCloudStorage-url]: https://webrtc.org/
+[GoogleCloudStorage-url]: https://cloud.google.com/storage
