@@ -227,15 +227,37 @@ public class App {
             updateInfo(userId, "Generating video summary...", "Processing video...");
 
             StringBuilder promptBuilder = new StringBuilder();
-            promptBuilder.append("Summarize this video for an editor.\n")
-                        .append("1. First, list important timestamps where meaningful events happen (format: [start-end]). No matter what, there should be more than 1 timestamp range, and no more than 6, try to aim for 5 ranges. The ranges should be throughout the entire video, don't make them all be in the beginning and omit the middle and end of the video.\n");
+            promptBuilder.append("You are a video‐editing assistant that produces both key clip timestamps and matching narration in JSON form.\n")
+                .append("1. First, list exactly 5 (up to 6) meaningful timestamp ranges where the video’s most important events happen, formatted as [\"M:SS–M:SS\"]. ")
+                .append("Distribute these ranges evenly from beginning to end—cover intro, build-up, midpoint twist, climax, and conclusion. ")
+                .append("Do not cluster them all at the start.\n")
+                .append("2. Then, write one short narration line for each timestamp range (so narration array length = timestamps array length). ")
+                .append("Each line must be 1–2 sentences, focused strictly on what happens inside that clip. ");
 
-            if (!voice.equalsIgnoreCase("none")) {
-                promptBuilder.append("2. Then, write a short narration in a ")
-                            .append(feel.toLowerCase()).append(" way ")
-                            .append("to accompany these clips, spoken in a ")
-                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be EXACTLY equal NO MATTER WHAT. The narration should be only for what's inside the timestamp ranges, not what's outside. It MUST be an array of size > 1, same with the timestamps. Ideally no more than size 6. Make sure the narration closes the video a bit at the end, so it doesn't feel like it ends suddenly, it should have some sort of conclusive feeling.\n");
-            } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
+            if (feel.equalsIgnoreCase("funny")) 
+                promptBuilder.append("Use genuine humor—craft witty punchlines, playful contrasts, or unexpected twists that earn a real laugh (not just “LOL”).\n");
+            else if (feel.equalsIgnoreCase("cinematic")) 
+                promptBuilder.append("Adopt a movie-trailer style—build suspense, use dramatic pacing, teaser phrases like “coming up,” and evoke big-screen excitement.\n");
+            else if (feel.equalsIgnoreCase("informational")) 
+                promptBuilder.append("Adopt an educational tone—clearly explain or teach a key takeaway or concept, turning each clip into a short mini-lesson.\n");
+            else promptBuilder.append("Blend humor, cinematic flair, and clear teaching points.\n");
+            
+            if (!voice.equalsIgnoreCase("none")) 
+                promptBuilder.append("3. Speak each narration in a ").append(voice.toLowerCase())
+                            .append(" voice. Do NOT include timestamps inside the narration text.\n");
+            else promptBuilder.append("3. Do not include any voice/style directive; just return the narration text.\n");
+            
+            promptBuilder.append("4. Return ONLY the following JSON object (no extra commentary):\n")
+                .append("{\n")
+                .append("  \"timestamps\": [\"0:00-0:05\", \"0:10-0:15\", \"0:20-0:25\", \"0:30-0:35\", \"0:40-0:45\"],\n")
+                .append("  \"narrations\": [\n")
+                .append("    \"First, we dive in with a bang—watch how this simple test changes everything.\",\n")
+                .append("    \"Now, the plot twists: you won’t believe the hack that makes it 10× faster.\",\n")
+                .append("    \"At the midway mark, an epic showdown of technique versus tool ensues.\",\n")
+                .append("    \"Here’s the climax—when theory meets practice in a dazzling display.\",\n")
+                .append("    \"Finally, we wrap up with the key takeaway that’ll level up your workflow.\"\n")
+                .append("  ]\n")
+                .append("}");
 
             ObjectMapper mapper = new ObjectMapper();
             Map<String, Object> generationConfig = Map.of(
