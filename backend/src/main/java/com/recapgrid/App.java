@@ -234,7 +234,7 @@ public class App {
                 promptBuilder.append("2. Then, write a short narration in a ")
                             .append(feel.toLowerCase()).append(" way ")
                             .append("to accompany these clips, spoken in a ")
-                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be exactly equal. The narration should be only for what's inside the timestamp ranges, not what's outside. It MUST be an array of size > 1, same with the timestamps. Ideally no more than size 6. Make sure the narration closes the video a bit at the end, so it doesn't feel like it ends suddenly, it should have some sort of conclusive feeling.\n");
+                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be EXACTLY equal NO MATTER WHAT. The narration should be only for what's inside the timestamp ranges, not what's outside. It MUST be an array of size > 1, same with the timestamps. Ideally no more than size 6. Make sure the narration closes the video a bit at the end, so it doesn't feel like it ends suddenly, it should have some sort of conclusive feeling.\n");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
             ObjectMapper mapper = new ObjectMapper();
