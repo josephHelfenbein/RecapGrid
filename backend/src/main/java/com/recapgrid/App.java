@@ -228,13 +228,13 @@ public class App {
 
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("Summarize this video for an editor.\n")
-                        .append("1. First, list important timestamps where meaningful events happen (format: [start-end]). There should be more than 1 timestamp range, and no more than 6.\n");
+                        .append("1. First, list important timestamps where meaningful events happen (format: [start-end]). No matter what, there should be more than 1 timestamp range, and no more than 6, try to aim for 5 ranges.\n");
 
             if (!voice.equalsIgnoreCase("none")) {
                 promptBuilder.append("2. Then, write a short narration in a ")
-                            .append(feel.toLowerCase()).append(" tone ")
+                            .append(feel.toLowerCase()).append(" way ")
                             .append("to accompany these clips, spoken in a ")
-                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be exactly equal. The narration should be only for what's inside the timestamp ranges, not what's outside. It MUST be an array of size > 1, same with the timestamps. Ideally no more than size 6.\n");
+                            .append(voice.toLowerCase()).append(" voice. Do not include timestamps in the narration. There should be a short narration string for each timestamp range, so the array sizes for timestamps and narration should be exactly equal. The narration should be only for what's inside the timestamp ranges, not what's outside. It MUST be an array of size > 1, same with the timestamps. Ideally no more than size 6. Make sure the narration closes the video a bit at the end, so it doesn't feel like it ends suddenly, it should have some sort of conclusive feeling.\n");
             } else promptBuilder.append("2. Do not include narration. Just return timestamps.");
 
             ObjectMapper mapper = new ObjectMapper();
