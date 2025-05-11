@@ -259,7 +259,6 @@
     const formData = new FormData();
     formData.append("fileData", file);
     formData.append("fileName", file.name);
-    formData.append("userId", user.value.id);
 
     try {
       const token = await getToken.value();
