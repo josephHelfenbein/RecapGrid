@@ -175,7 +175,7 @@
 
   async function getVideos(userId){
     try{
-      const token = await getToken.value();
+      const token = await getToken();
       if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`, {
         headers: {
