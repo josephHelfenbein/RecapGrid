@@ -175,10 +175,11 @@
 
   async function getVideos(userId){
     try{
-      if(!getToken) throw new Error('getToken is not available');
+      const token = await getToken.value();
+      if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`, {
         headers: {
-          "Authorization": `Bearer ${await getToken()}`,
+          "Authorization": `Bearer ${token}`,
         },
       });
       const data = await response.json();
@@ -192,10 +193,11 @@
   }
   async function getPending(userId){
     try{
-      if(!getToken) throw new Error('getToken is not available');
+      const token = await getToken();
+      if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`, {
           headers: {
-            "Authorization": `Bearer ${await getToken()}`,
+            "Authorization": `Bearer ${token}`,
           },
         });
       const data = await response.json();
@@ -260,12 +262,13 @@
     formData.append("userId", user.value.id);
 
     try {
-      if(!getToken) throw new Error('getToken is not available');
+      const token = await getToken();
+      if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/videos/upload?userId=${encodeURIComponent(user.value.id)}`, {
         method: "POST",
         body: formData,
         headers: {
-          "Authorization": `Bearer ${await getToken()}`,
+          "Authorization": `Bearer ${token}`,
         },
       });
 
@@ -299,12 +302,13 @@
       userId: fileToProcess.value.userId,
     });
     try{
-      if(!getToken) throw new Error('getToken is not available');
+      const token = await getToken();
+      if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/processVideo?${queryParams.toString()}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${await getToken()}`,
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           userId: fileToProcess.value.userId,
