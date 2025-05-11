@@ -136,7 +136,7 @@ Here are the steps to run the project locally if you want to develop your own pr
    ```
 
 3. Create a Clerk account at [https://clerk.com/](https://clerk.com/), and create a project. Get the API keys `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY`
-    and put them in the environment variables for the frontend folder. Additionally, create webhooks on Clerk, one of them with endpoint {yourdomain}/api/delete-user with a subscribed event of user.deleted, and one of them with endpoint {yourdomain}/api/clerk-user with subscribed events user.created and user.updated.
+    and put them in the environment variables for the frontend folder. Additionally, create webhooks on Clerk, one of them with endpoint {yourdomain}/api/delete-user with a subscribed event of user.deleted, and one of them with endpoint {yourdomain}/api/clerk-user with subscribed events user.created and user.updated. Have the signature keys put in the backend environment variables as `CLERK_WEBHOOK_SECRET_CLERK_USER` and `CLERK_WEBHOOK_SECRET_DELETE_USER`, and the Clerk secret key as `CLERK_SECRET_KEY`.
 
 4. For the frontend folder, put your backend url as `NUXT_PUBLIC_API_BASE` and `NUXT_PUBLIC_API_URL`.
 

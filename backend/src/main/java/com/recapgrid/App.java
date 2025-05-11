@@ -13,6 +13,7 @@ import com.recapgrid.repository.ProcessedRepository;
 import com.recapgrid.repository.StatusRepository;
 import com.recapgrid.repository.UserRepository;
 
+
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -34,14 +35,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -235,7 +234,7 @@ public class App {
                 .append("Each line must be 1–2 sentences, focused strictly on what happens inside that clip. ");
 
             if (feel.equalsIgnoreCase("funny")) 
-                promptBuilder.append("Use genuine humor—craft witty punchlines, playful contrasts, or unexpected twists that earn a real laugh (not just “LOL”).\n");
+                promptBuilder.append("Use genuine humor—craft witty punchlines, playful contrasts, or unexpected twists that earn a real laugh (not just “LOL”). Use modern slang and random funny comments.\n");
             else if (feel.equalsIgnoreCase("cinematic")) 
                 promptBuilder.append("Adopt a movie-trailer style—build suspense, use dramatic pacing, teaser phrases like “coming up,” and evoke big-screen excitement.\n");
             else if (feel.equalsIgnoreCase("informational")) 

@@ -143,8 +143,11 @@
   import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
   import { useNuxtApp } from '#app'
   import { SignedOut } from '@clerk/vue';
+  import { useAuth } from '@clerk/vue'
 
   const { user } = useUser();
+  const { getToken } =useAuth();
+  const jwt = session.getToken();
   const videoPopup = ref(null)
   const videos = ref([]);
   const pendingVideos = ref([]);
@@ -172,18 +175,38 @@
   });
 
   async function getVideos(userId){
-    const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`);
-    const data = await response.json();
-    videos.value = data;
-    loadedVideos.value = true;
-    console.log(data);
+    try{
+      if(!getToken) throw new Error('getToken is not available');
+      const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`, {
+        headers: {
+          "Authorization": `Bearer ${await getToken()}`,
+        },
+      });
+      const data = await response.json();
+      videos.value = data;
+      loadedVideos.value = true;
+      console.log(data);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+      alertNew("Error fetching videos:", error);
+    }
   }
   async function getPending(userId){
-    const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`);
-    const data = await response.json();
-    pendingVideos.value = data;
-    loadedPending.value = true;
-    console.log(data);
+    try{
+      if(!getToken) throw new Error('getToken is not available');
+      const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`, {
+          headers: {
+            "Authorization": `Bearer ${await getToken()}`,
+          },
+        });
+      const data = await response.json();
+      pendingVideos.value = data;
+      loadedPending.value = true;
+      console.log(data);
+    } catch (error) {
+      console.error('Error fetching pending videos:', error);
+      alertNew("Error fetching pending videos:", error);
+    }
   }
 
   const handleDrop = (event) => {
@@ -238,9 +261,13 @@
     formData.append("userId", user.value.id);
 
     try {
-      const response = await fetch("/api/videos/upload", {
+      if(!getToken) throw new Error('getToken is not available');
+      const response = await fetch(`/api/videos/upload?userId=${encodeURIComponent(user.value.id)}`, {
         method: "POST",
         body: formData,
+        headers: {
+          "Authorization": `Bearer ${await getToken()}`,
+        },
       });
 
       if (!response.ok) throw new Error(`Upload failed with status ${response.status}`);
@@ -270,12 +297,15 @@
     const queryParams = new URLSearchParams({
       voice: data.voice,
       feel: data.feel,
+      userId: fileToProcess.value.userId,
     });
     try{
+      if(!getToken) throw new Error('getToken is not available');
       const response = await fetch(`/api/processVideo?${queryParams.toString()}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${await getToken()}`,
         },
         body: JSON.stringify({
           userId: fileToProcess.value.userId,
