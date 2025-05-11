@@ -146,8 +146,7 @@
   import { useAuth } from '@clerk/vue'
 
   const { user } = useUser();
-  const { getToken } =useAuth();
-  const jwt = session.getToken();
+  const { getToken } = useAuth();
   const videoPopup = ref(null)
   const videos = ref([]);
   const pendingVideos = ref([]);
