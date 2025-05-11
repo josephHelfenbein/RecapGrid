@@ -175,7 +175,7 @@
 
   async function getVideos(userId){
     try{
-      const token = await getToken();
+      const token = await getToken.value();
       if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/processed?userId=${encodeURIComponent(userId)}`, {
         headers: {
@@ -193,7 +193,7 @@
   }
   async function getPending(userId){
     try{
-      const token = await getToken();
+      const token = await getToken.value();
       if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/videos?userId=${encodeURIComponent(userId)}`, {
           headers: {
@@ -262,7 +262,7 @@
     formData.append("userId", user.value.id);
 
     try {
-      const token = await getToken();
+      const token = await getToken.value();
       if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/videos/upload?userId=${encodeURIComponent(user.value.id)}`, {
         method: "POST",
@@ -302,7 +302,7 @@
       userId: fileToProcess.value.userId,
     });
     try{
-      const token = await getToken();
+      const token = await getToken.value();
       if(!token) throw new Error('Token is not available');
       const response = await fetch(`/api/processVideo?${queryParams.toString()}`, {
         method: "POST",
