@@ -201,28 +201,6 @@ public class App {
             }
             logger.info("Saved original video to GCS temp: {}", originalPath);
 
-            updateInfo(userId, "Compressing original video...", "Processing video...");
-            Path compressedOriginal = gcsTempDir.resolve("compressed-orig-" + UUID.randomUUID() + ".mp4");
-            ProcessBuilder initialCompressBuilder = new ProcessBuilder(
-                "ffmpeg", "-y",
-                "-i", originalPath.toString(),
-                "-vf", "scale=640:-2",
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
-                "-crf", "30",
-                "-c:a", "aac",
-                "-b:a", "64k",
-                "-movflags", "+faststart",
-                compressedOriginal.toString()
-            );
-            initialCompressBuilder.inheritIO();
-            int compressCode = initialCompressBuilder.start().waitFor();
-            if (compressCode != 0) {
-                logger.error("Error compressing original video - Code: {}", compressCode);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-            }
-            logger.info("Compressed original video to: {}", compressedOriginal);
-
             updateInfo(userId, "Generating video summary...", "Processing video...");
 
             StringBuilder promptBuilder = new StringBuilder();
@@ -295,7 +273,7 @@ public class App {
                         }
                     };
                     
-                    try(InputStream fin = Files.newInputStream(compressedOriginal)) {
+                    try(InputStream fin = Files.newInputStream(originalPath)) {
                         byte[] buf = new byte[16_384];
                         int r;
                         while((r = fin.read(buf)) > 0) b64Out.write(buf, 0, r);
@@ -369,7 +347,7 @@ public class App {
 
                 ProcessBuilder processBuilder = new ProcessBuilder(
                     "ffmpeg", "-y",
-                    "-i", compressedOriginal.toString(),
+                    "-i", originalPath.toString(),
                     "-ss", start,
                     "-t", String.valueOf(dur.toSeconds()),
                     "-c:v", "libx264",
@@ -456,8 +434,8 @@ public class App {
                 try(BufferedWriter w = Files.newBufferedWriter(srt, StandardCharsets.UTF_8)){
                     for(int i=0; i<newTimestamps.size(); i++){
                         String timestamp = newTimestamps.get(i);
-                        String start = toSrtTime(timestamp.split("-")[0].trim());
-                        String end = toSrtTime(timestamp.split("-")[1].trim());
+                        String start = normalizeTime(timestamp.split("-")[0].trim());
+                        String end = normalizeTime(timestamp.split("-")[1].trim());
                         String narration = narrationsNode.get(i).asText();
                         w.write(Integer.toString(i+1)); w.newLine();
                         w.write(start + " --> " + end); w.newLine();
@@ -535,72 +513,45 @@ public class App {
     private String toTimestamp(String start, double duration){
         Duration durStart = parseDuration(start);
         long addSecs = Math.round(duration);
-        Duration durEnd = durStart.plusSeconds(addSecs);
+        long addMillis = Math.round((duration - addSecs) * 1_000);
+        Duration durEnd = durStart.plusSeconds(addSecs).plusMillis(addMillis);
         return formatDuration(durStart) + "-" + formatDuration(durEnd);
     }
 
     private String formatDuration(Duration duration) {
-        long totalSeconds = duration.getSeconds();
-        long hours = totalSeconds / 3600;
-        long minutes = (totalSeconds % 3600) / 60;
-        long seconds = totalSeconds % 60;
-        if(hours>0) return String.format("%d:%02d:%02d", hours, minutes, seconds);
-        return String.format("%02d:%02d", minutes, seconds);
+        long ms = duration.toMillis();
+        long hours = ms / 3_600_000;
+        long minutes = (ms % 3_600_000) / 3_600_000;
+        long seconds = (ms % 60_000) / 1_000;
+        long millis = ms % 1_000;
+        return String.format("%02d:%02d:%02d,%03d", hours, minutes, seconds, millis);
     }
 
-    private String toSrtTime(String ts){
-        String[] parts = ts.split(":");
-        int h, m, s;
-        if(parts.length == 2){
-            h = 0;
-            m = Integer.parseInt(parts[0]);
-            s = Integer.parseInt(parts[1]);
-        } else if(parts.length == 3){
-            h = Integer.parseInt(parts[0]);
-            m = Integer.parseInt(parts[1]);
-            s = Integer.parseInt(parts[2]);
-        } else {
-            throw new IllegalArgumentException("Invalid timestamp format: " + ts);
-        }
-        return String.format("%02d:%02d:%02d,000", h, m, s);
+    private String normalizeTime(String ts){
+        Duration dur = parseDuration(ts);
+        return formatDuration(dur);
     }
 
     private Duration parseDuration(String timestamp) {
         String[] parts = timestamp.split(":");
         try{
+            long h = 0, m = 0, s = 0, n = 0;
+            double sDouble = 0;
             if (parts.length == 2) {
-                long m = Long.parseLong(parts[0]);
-                long s = Long.parseLong(parts[1]);
-                return Duration.ofMinutes(m).plusSeconds(s);
+                m = Long.parseLong(parts[0]);
+                sDouble = Double.parseDouble(parts[1]);
             } else if (parts.length == 3) {
-                long h = Long.parseLong(parts[0]);
-                long m = Long.parseLong(parts[1]);
-                long s = Long.parseLong(parts[2]);
-                return Duration.ofHours(h).plusMinutes(m).plusSeconds(s);
+                h = Long.parseLong(parts[0]);
+                m = Long.parseLong(parts[1]);
+                sDouble = Double.parseDouble(parts[2]);
             }
+            s = (long) sDouble;
+            m = (long) ((sDouble - s) * 1_000_000_000);
+            return Duration.ofHours(h).plusMinutes(m).plusSeconds(s).plusNanos(n);
         } catch(NumberFormatException e) {
             logger.warn("Invalid time format: {}", timestamp);
         }
         return Duration.ZERO;
-    }
-
-    private String normalizeTime(String time){
-        String[] segs = time.split(":");
-        try{
-            if(segs.length == 2){
-                int m = Integer.parseInt(segs[0]);
-                int s = Integer.parseInt(segs[1]);
-                return String.format("%02d:%02d", m, s);
-            } else if(segs.length == 3){
-                int h = Integer.parseInt(segs[0]);
-                int m = Integer.parseInt(segs[1]);
-                int s = Integer.parseInt(segs[2]);
-                return String.format("%02d:%02d:%02d", h, m, s);
-            }
-        } catch(NumberFormatException e){
-            logger.warn("Invalid time format: {}", time);
-        }
-        return time;
     }
 
     private ResponseEntity<Processed> uploadProcessed(
