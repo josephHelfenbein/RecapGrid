@@ -1,4 +1,4 @@
-FROM maven:3.9.9-openjdk-17-alpine AS builder
+FROM maven:3.9.9-openjdk-17-slim AS builder
 
 WORKDIR /build
 
