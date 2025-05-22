@@ -340,8 +340,8 @@ public class App {
                     logger.warn("Skipping malformed timestamp: {}", timestampNode.asText());
                     continue;
                 }
-                String start = normalizeTime(parts[0].trim());
-                String end = normalizeTime(parts[1].trim());
+                String start = normalizeFfmpegTime(parts[0].trim());
+                String end = normalizeFfmpegTime(parts[1].trim());
                 Duration dur = parseDuration(end).minus(parseDuration(start));
                 Path seg = gcsTempDir.resolve("seg-" + i + ".mp4");
                 logger.info("Creating segment {} -> {}", seg, timestampNode.asText());
@@ -435,8 +435,8 @@ public class App {
                 try(BufferedWriter w = Files.newBufferedWriter(srt, StandardCharsets.UTF_8)){
                     for(int i=0; i<newTimestamps.size(); i++){
                         String timestamp = newTimestamps.get(i);
-                        String start = normalizeTime(timestamp.split("-")[0].trim());
-                        String end = normalizeTime(timestamp.split("-")[1].trim());
+                        String start = normalizeSrtTime(timestamp.split("-")[0].trim());
+                        String end = normalizeSrtTime(timestamp.split("-")[1].trim());
                         String narration = narrationsNode.get(i).asText();
                         w.write(Integer.toString(i+1)); w.newLine();
                         w.write(start + " --> " + end); w.newLine();
@@ -519,21 +519,34 @@ public class App {
         long addSecs = Math.round(duration);
         long addMillis = Math.round((duration - addSecs) * 1_000);
         Duration durEnd = durStart.plusSeconds(addSecs).plusMillis(addMillis);
-        return formatDuration(durStart) + "-" + formatDuration(durEnd);
+        return formatFfmpegDuration(durStart) + "-" + formatFfmpegDuration(durEnd);
     }
 
-    private String formatDuration(Duration duration) {
+    private String formatFfmpegDuration(Duration duration) {
         long ms = duration.toMillis();
         long hours = ms / 3_600_000;
-        long minutes = (ms % 3_600_000) / 3_600_000;
+        long minutes = (ms % 3_600_000) / 60_000;
         long seconds = (ms % 60_000) / 1_000;
         long millis = ms % 1_000;
         return String.format("%02d:%02d:%02d,%03d", hours, minutes, seconds, millis);
     }
 
-    private String normalizeTime(String ts){
+    private String formatSrtDuration(Duration duration) {
+        long ms = duration.toMillis();
+        long hours = ms / 3_600_000;
+        long minutes = (ms % 3_600_000) / 60_000;
+        long seconds = (ms % 60_000) / 1_000;
+        long millis = ms % 1_000;
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, millis);
+    }
+
+    private String normalizeSrtTime(String ts){
         Duration dur = parseDuration(ts);
-        return formatDuration(dur);
+        return formatSrtDuration(dur);
+    }
+    private String normalizeFfmpegTime(String ts){
+        Duration dur = parseDuration(ts);
+        return formatFfmpegDuration(dur);
     }
 
     private Duration parseDuration(String timestamp) {
