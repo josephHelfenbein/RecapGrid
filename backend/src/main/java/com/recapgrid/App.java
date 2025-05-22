@@ -512,6 +512,7 @@ public class App {
         Long fileSize = null;
         try{
             fileSize = Files.size(originalPath);
+            System.out.println("File size: " + fileSize);
         } catch(IOException | UnsupportedOperationException e){
             System.out.println("Could not get file size: " + e.getMessage());
         }
@@ -520,15 +521,40 @@ public class App {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Goog-Upload-Protocol", "resumable");
         headers.set("X-Goog-Upload-Command", "start");
-        if(fileSize != null) headers.set("X-Goog-Upload-File-Size", String.valueOf(fileSize));
+        if(fileSize != null) headers.set("X-Goog-Upload-Header-Content-Length", String.valueOf(fileSize));
         headers.set("X-Goog-Upload-Header-Content-Type", mimeType);
+        headers.setContentLength(metadata.length);
         
         RequestEntity<byte[]> startRequest = new RequestEntity<>(metadata, headers, HttpMethod.POST, URI.create(url));
-        ResponseEntity<Void> startResponse = restTemplate.exchange(startRequest, Void.class);
+        ResponseEntity<Void> startResponse;
+        try {
+            startResponse = restTemplate.exchange(startRequest, Void.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initiate upload with Gemini: " + e.getMessage(), e);
+        }
 
+        if(!startResponse.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Failed to initiate upload with Gemini: " + startResponse.getStatusCode() + " - " + startResponse.getBody());
+        }
+
+        String uploadUrl = null;
         List<String> sessionUrls = startResponse.getHeaders().get("X-Goog-Upload-URL");
-        if (sessionUrls == null || sessionUrls.isEmpty()) throw new IllegalStateException("No upload URL found in response headers");
-        String uploadUrl = sessionUrls.get(0);
+        if (sessionUrls != null && !sessionUrls.isEmpty()) {
+            uploadUrl = sessionUrls.get(0);
+            System.out.println("Found upload URL with header: " + uploadUrl + " - " + "X-Goog-Upload-URL");
+        } else {
+            sessionUrls = startResponse.getHeaders().get("x-goog-upload-url");
+            if (sessionUrls != null && !sessionUrls.isEmpty()) {
+                uploadUrl = sessionUrls.get(0);
+                System.out.println("Found upload URL with header: " + uploadUrl + " - " + "x-goog-upload-url");
+            } else {
+                sessionUrls = startResponse.getHeaders().get("Location");
+                if (sessionUrls != null && !sessionUrls.isEmpty()) {
+                    uploadUrl = sessionUrls.get(0);
+                    System.out.println("Found upload URL with header: " + uploadUrl + " - " + "Location");
+                }
+            }
+        }
 
         if(fileSize==null){
             try(InputStream sizeStream = Files.newInputStream(originalPath, StandardOpenOption.READ)){
