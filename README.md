@@ -154,7 +154,7 @@ select
 
 7. Enable Gemini on Google Cloud Platform and add the API key to the backend folder as `GEMINI_KEY`.
 
-8. Build the backend folder by running `mvn clean install`. For local, both folders can be run by building and running their Dockerfiles.
+8. For local, both folders can be run by building and running their Dockerfiles.
 
 
 <!-- LICENSE -->
