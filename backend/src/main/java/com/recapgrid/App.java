@@ -563,7 +563,7 @@ public class App {
                 sDouble = Double.parseDouble(parts[2]);
             }
             s = (long) sDouble;
-            m = (long) ((sDouble - s) * 1_000_000_000);
+            n = (long) ((sDouble - s) * 1_000_000_000);
             return Duration.ofHours(h).plusMinutes(m).plusSeconds(s).plusNanos(n);
         } catch(NumberFormatException e) {
             logger.warn("Invalid time format: {}", timestamp);
