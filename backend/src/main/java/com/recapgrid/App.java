@@ -526,40 +526,51 @@ public class App {
                 throw new RuntimeException("Failed to determine file size", ex);
             }
         }
+        String metadata = "{\"file\":{\"display_name\":\"" + video.getFileName() + "\"}}";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        HttpHeaders metadataHeaders = new HttpHeaders();
-        metadataHeaders.setContentType(MediaType.APPLICATION_JSON);
-        String metadataJson = String.format("{\"file\":{\"display_name\":\"%s\"}}", video.getFileName());
-        HttpEntity<String> metadataPart = new HttpEntity<>(metadataJson, metadataHeaders);
-        HttpHeaders fileHeaders = new HttpHeaders();
-        fileHeaders.setContentType(MediaType.parseMediaType(mimeType));
-        byte[] fileContent;
-        try(InputStream fileStream = Files.newInputStream(originalPath)) {
-            fileContent = fileStream.readAllBytes();
-        } catch(IOException e) {
-            throw new RuntimeException("Failed to read file content", e);
-        }
-        HttpEntity<byte[]> filePart = new HttpEntity<>(fileContent, fileHeaders);
+        HttpHeaders startHeaders = new HttpHeaders();
+        startHeaders.setContentType(MediaType.APPLICATION_JSON);
+        startHeaders.set("X-Goog-Upload-Protocol", "resumable");
+        startHeaders.set("X-Goog-Upload-Command", "start");
+        startHeaders.set("X-Goog-Upload-Header-Content-Length", String.valueOf(fileSize));
+        startHeaders.set("X-Goog-Upload-Header-Content-Type", mimeType);
+        HttpEntity<String> startReq = new HttpEntity<>(metadata, startHeaders);
+        ResponseEntity<Void> startResp = restTemplate.exchange(url, HttpMethod.POST, startReq, Void.class);
 
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("metadata", metadataPart);
-        body.add("file", filePart);
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+        System.out.println("Headers: " + startResp.getHeaders());
+        String uploadUrl = startResp.getHeaders().getFirst("X-Goog-Upload-URL");
+        if(uploadUrl == null) throw new IllegalStateException("No upload URL returned");
 
-        String responseBody = response.getBody();
-        if(responseBody == null) {
-            throw new IllegalStateException("Response body is null");
+        RequestCallback uploadCallback = request -> {
+            HttpHeaders h = request.getHeaders();
+            h.set("X-Goog-Upload-Offset", "0");
+            h.set("X-Goog-Upload-Command", "upload, finalize");
+            h.setContentType(MediaType.parseMediaType(mimeType));
+            try(InputStream in = Files.newInputStream(originalPath);
+                OutputStream out = request.getBody()){
+                    byte[] buf = new byte[16_384];
+                    int r;
+                    while((r = in.read(buf)) > 0) out.write(buf, 0, r);
+            }
+        };
+        ResponseExtractor<String> extractor = clientResponse -> {
+            try(InputStream in = clientResponse.getBody()){
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        };
+        String finalizeJson = restTemplate.execute(uploadUrl, HttpMethod.PUT, uploadCallback, extractor);
+        System.out.println("Finalized JSON: " + finalizeJson);
+        if(finalizeJson==null) throw new IllegalStateException("No finalize JSON returned");
+
+        try{
+            JsonNode root = new ObjectMapper().readTree(finalizeJson);
+            String fileUri = root.path("file").path("uri").asText(null);
+            if(fileUri == null) throw new IllegalStateException("No file URI returned");
+            return fileUri;
         }
-        
-        int idx = responseBody.indexOf("\"uri\":\"");
-        if (idx == -1) {
-            throw new IllegalStateException("No URI found in response body");
+        catch(IOException e){
+            throw new RuntimeException("Failed to parse finalize JSON", e);
         }
-        String uri = responseBody.substring(idx + 7, responseBody.indexOf("\"", idx + 7));
-        return uri;
     }
 
     private String toTimestamp(String start, double duration){
