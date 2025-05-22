@@ -28,7 +28,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RequestCallback;
+import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -41,6 +44,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -59,6 +63,7 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 
+import com.google.api.Http;
 import com.google.cloud.texttospeech.v1.*;
 import com.google.protobuf.ByteString;
 
@@ -202,6 +207,10 @@ public class App {
             }
             logger.info("Saved original video to GCS temp: {}", originalPath);
 
+            updateInfo(userId, "Sending video to Gemini...", "Processing video...");
+
+            String geminiUploadPath = uploadToGemini(video, originalPath);
+
             updateInfo(userId, "Generating video summary...", "Processing video...");
 
             StringBuilder promptBuilder = new StringBuilder();
@@ -237,7 +246,7 @@ public class App {
                 .append("  ]\n")
                 .append("}");
 
-            ObjectMapper mapper = new ObjectMapper();
+            ObjectMapper generateMapper = new ObjectMapper();
             Map<String, Object> generationConfig = Map.of(
                 "response_mime_type", "application/json",
                 "response_schema", Map.of(
@@ -252,45 +261,27 @@ public class App {
                 )
             );
 
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
-            RestTemplate restTemplate = new RestTemplate();
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiKey;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-            ResponseEntity<String> response = restTemplate.execute(
-                url, 
-                HttpMethod.POST, 
-                request -> {
-                    request.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-                    OutputStream out = request.getBody();
-                    String prefix = 
-                        "{\"contents\":[{\"parts\":["
-                        + "{\"text\":" + mapper.writeValueAsString(promptBuilder.toString()) + "},"
-                        + "{\"inline_data\":{\"mime_type\":\"video/mp4\",\"data\":\"";
-                    out.write(prefix.getBytes(StandardCharsets.UTF_8));
-
-                    OutputStream b64Out = new FilterOutputStream(Base64.getEncoder().wrap(out)){
-                        @Override
-                        public void close() throws IOException {
-                            super.flush();
-                        }
-                    };
-                    
-                    try(InputStream fin = Files.newInputStream(originalPath)) {
-                        byte[] buf = new byte[16_384];
-                        int r;
-                        while((r = fin.read(buf)) > 0) b64Out.write(buf, 0, r);
-                        b64Out.flush();
-                    }
-                    String suffix = "\"}}]}],"
-                        + "\"generationConfig\":"
-                        + mapper.writeValueAsString(generationConfig)
-                        + "}";
-                    out.write(suffix.getBytes(StandardCharsets.UTF_8));
-                }, 
-                clientResponse -> {
-                    String body = new String(clientResponse.getBody().readAllBytes(), StandardCharsets.UTF_8);
-                    return new ResponseEntity<>(body, clientResponse.getHeaders(), clientResponse.getStatusCode());
-                }
+            Map<String, Object> contents = Map.of(
+                "parts", List.of(
+                    Map.of("text", promptBuilder.toString()),
+                    Map.of("file_data", Map.of(
+                        "mime_type", "video/mp4",
+                        "uri", geminiUploadPath
+                    ))
+                )
             );
+            Map<String, Object> requestBody = Map.of(
+                "contents", List.of(contents),
+                "generationConfig", generationConfig
+            );
+            String requestJson = generateMapper.writeValueAsString(requestBody);
+
+            HttpEntity<String> req = new HttpEntity<>(requestJson, headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, req, String.class);
 
             updateInfo(userId, "Parsing AI response...", "Processing video...");
 
@@ -512,6 +503,48 @@ public class App {
             }
         }
         return result;
+    }
+
+    private String uploadToGemini(Video video, Path originalPath) {
+        String url = "https://generativelanguage.googleapis.com/v1beta/files?key=" + geminiKey;
+        long fileSize  = originalPath.toFile().length();
+        String mimeType = "video/mp4";
+        byte[] metadata = ("{\"file\":{\"display_name\":\"" + video.getFileName() + "\"}}").getBytes(StandardCharsets.UTF_8);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Goog-Upload-Protocol", "resumable");
+        headers.set("X-Goog-Upload-Command", "start");
+        headers.set("X-Goog-Upload-Header-Content-Length", String.valueOf(fileSize));
+        headers.set("X-Goog-Upload-Header-Content-Type", mimeType);
+        
+        RequestEntity<byte[]> startRequest = new RequestEntity<>(metadata, headers, HttpMethod.POST, URI.create(url));
+
+        ResponseEntity<Void> startResponse = restTemplate.exchange(startRequest, Void.class);
+        List<String> sessionUrls = startResponse.getHeaders().get("X-Goog-Upload-URL");
+        if (sessionUrls == null || sessionUrls.isEmpty()) throw new IllegalStateException("No upload URL found in response headers");
+        String uploadUrl = sessionUrls.get(0);
+
+        RequestCallback uploadCallback = request -> {
+            HttpHeaders h = request.getHeaders();
+            h.set("X-Goog-Upload-Offset", "0");
+            h.set("X-Goog-Upload-Command", "upload, finalize");
+            h.setContentType(MediaType.parseMediaType(mimeType));
+            request.getBody().write(Files.readAllBytes(originalPath));
+        };
+        ResponseExtractor<String> responseExtractor = clientResp -> {
+            try(InputStream in = clientResp.getBody()) {
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        };
+        restTemplate.execute(uploadUrl, HttpMethod.POST, uploadCallback, responseExtractor);
+
+        ResponseEntity<String> info = restTemplate.getForEntity(uploadUrl.replace("/upload/", "/"), String.class);
+        String body = info.getBody();
+        int idx = body.indexOf("\"uri\":\"");
+        if (idx == -1) throw new IllegalStateException("No URI found in response body");
+        String uri = body.substring(idx + 7, body.indexOf("\"", idx + 7));
+        return uri;
     }
 
     private String toTimestamp(String start, double duration){
