@@ -508,7 +508,7 @@ public class App {
     }
 
     private String uploadToGemini(Video video, Path originalPath) {
-        String url = "https://generativelanguage.googleapis.com/v1beta/files?key=" + geminiKey;
+        String url = "https://generativelanguage.googleapis.com/upload/v1beta/files?key=" + geminiKey;
         String mimeType = "video/mp4";
         Long fileSize = null;
         try{
