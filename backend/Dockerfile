@@ -1,16 +1,19 @@
-FROM maven:3.9.9-openjdk-17-slim AS builder
+FROM maven:3.9.9-eclipse-temurin-17 AS builder
 
 WORKDIR /build
 
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:go-offile -B
 
 COPY src ./src
 RUN mvn clean package -DskipTests -B
 
-FROM eclipse-temurin:17-alpine
+FROM eclipse-temurin:17-jdk
 
-RUN apk add --no-cache ffmpeg
+RUN apt-get update && \
+    apt-get install -y ffmpeg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
