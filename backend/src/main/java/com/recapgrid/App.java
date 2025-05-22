@@ -577,9 +577,12 @@ public class App {
     }
 
     private void waitForFileActive(String fileName) throws Exception{
+        String fileId = fileName.startsWith("files/")
+        ? fileName.substring("files/".length())
+        : fileName;
         ObjectMapper mapper = new ObjectMapper();
         String url = "https://generativelanguage.googleapis.com/v1beta/files/"
-                   + URLEncoder.encode(fileName, "UTF-8")
+                   + URLEncoder.encode(fileId, "UTF-8")
                    + "?key=" + geminiKey;
         for(int i=0; i<10; i++){
             String body = restTemplate.getForObject(url, String.class);
