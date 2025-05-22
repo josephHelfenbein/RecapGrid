@@ -48,6 +48,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -566,11 +567,27 @@ public class App {
             JsonNode root = new ObjectMapper().readTree(finalizeJson);
             String fileUri = root.path("file").path("uri").asText(null);
             if(fileUri == null) throw new IllegalStateException("No file URI returned");
+            waitForFileActive(fileUri);
             return fileUri;
-        }
-        catch(IOException e){
+        } catch(IOException e){
             throw new RuntimeException("Failed to parse finalize JSON", e);
+        } catch(Exception e){
+            throw new RuntimeException("Error during upload", e);
         }
+    }
+
+    private void waitForFileActive(String fileName) throws Exception{
+        ObjectMapper mapper = new ObjectMapper();
+        String url = "https://generativelanguage.googleapis.com/v1beta/files/"
+                   + URLEncoder.encode(fileName, "UTF-8")
+                   + "?key=" + geminiKey;
+        for(int i=0; i<10; i++){
+            String body = restTemplate.getForObject(url, String.class);
+            String state = mapper.readTree(body).path("file").path("state").asText();
+            if(state.equalsIgnoreCase("ACTIVE")) return;
+            Thread.sleep(500);
+        }
+        throw new IllegalStateException("File never became active");
     }
 
     private String toTimestamp(String start, double duration){
