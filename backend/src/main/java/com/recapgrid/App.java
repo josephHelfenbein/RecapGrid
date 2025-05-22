@@ -29,6 +29,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RequestCallback;
 import org.springframework.web.client.ResponseExtractor;
@@ -508,105 +510,55 @@ public class App {
     private String uploadToGemini(Video video, Path originalPath) {
         String url = "https://generativelanguage.googleapis.com/v1beta/files?key=" + geminiKey;
         String mimeType = "video/mp4";
-        byte[] metadata = ("{\"file\":{\"display_name\":\"" + video.getFileName() + "\"}}").getBytes(StandardCharsets.UTF_8);
         Long fileSize = null;
         try{
             fileSize = Files.size(originalPath);
             System.out.println("File size: " + fileSize);
         } catch(IOException | UnsupportedOperationException e){
-            System.out.println("Could not get file size: " + e.getMessage());
+            fileSize = 0L;
+            try (InputStream sizeStream = Files.newInputStream(originalPath)) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = sizeStream.read(buffer)) != -1) {
+                    fileSize += bytesRead;
+                }
+            } catch (IOException ex) {
+                throw new RuntimeException("Failed to determine file size", ex);
+            }
         }
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-Goog-Upload-Protocol", "resumable");
-        headers.set("X-Goog-Upload-Command", "start");
-        if(fileSize != null) headers.set("X-Goog-Upload-Header-Content-Length", String.valueOf(fileSize));
-        headers.set("X-Goog-Upload-Header-Content-Type", mimeType);
-        headers.setContentLength(metadata.length);
-        
-        RequestEntity<byte[]> startRequest = new RequestEntity<>(metadata, headers, HttpMethod.POST, URI.create(url));
-        ResponseEntity<Void> startResponse;
-        try {
-            startResponse = restTemplate.exchange(startRequest, Void.class);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initiate upload with Gemini: " + e.getMessage(), e);
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        HttpHeaders metadataHeaders = new HttpHeaders();
+        metadataHeaders.setContentType(MediaType.APPLICATION_JSON);
+        String metadataJson = String.format("{\"file\":{\"display_name\":\"%s\"}}", video.getFileName());
+        HttpEntity<String> metadataPart = new HttpEntity<>(metadataJson, metadataHeaders);
+        HttpHeaders fileHeaders = new HttpHeaders();
+        fileHeaders.setContentType(MediaType.parseMediaType(mimeType));
+        byte[] fileContent;
+        try(InputStream fileStream = Files.newInputStream(originalPath)) {
+            fileContent = fileStream.readAllBytes();
+        } catch(IOException e) {
+            throw new RuntimeException("Failed to read file content", e);
         }
+        HttpEntity<byte[]> filePart = new HttpEntity<>(fileContent, fileHeaders);
 
-        if(!startResponse.getStatusCode().is2xxSuccessful()) {
-            throw new RuntimeException("Failed to initiate upload with Gemini: " + startResponse.getStatusCode() + " - " + startResponse.getBody());
-        }
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("metadata", metadataPart);
+        body.add("file", filePart);
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
-        System.out.println("Response status: " + startResponse.getStatusCode());
-        System.out.println("All response headers: " + startResponse.getHeaders());
-
-        System.out.println("Response body: " + startResponse.getBody());
-
-        String uploadUrl = null;
-        List<String> sessionUrls = startResponse.getHeaders().get("X-Goog-Upload-URL");
-        if (sessionUrls != null && !sessionUrls.isEmpty()) {
-            uploadUrl = sessionUrls.get(0);
-        } else {
-            sessionUrls = startResponse.getHeaders().get("x-goog-upload-url");
-            if (sessionUrls != null && !sessionUrls.isEmpty()) {
-                uploadUrl = sessionUrls.get(0);
-            } else {
-                sessionUrls = startResponse.getHeaders().get("Location");
-                if (sessionUrls != null && !sessionUrls.isEmpty()) {
-                    uploadUrl = sessionUrls.get(0);
-                }
-            }
+        String responseBody = response.getBody();
+        if(responseBody == null) {
+            throw new IllegalStateException("Response body is null");
         }
         
-        if (uploadUrl == null) {
-            throw new IllegalStateException("No upload URL found in response headers. Available headers: " + 
-                startResponse.getHeaders().keySet());
+        int idx = responseBody.indexOf("\"uri\":\"");
+        if (idx == -1) {
+            throw new IllegalStateException("No URI found in response body");
         }
-        
-        if(fileSize==null){
-            try(InputStream sizeStream = Files.newInputStream(originalPath, StandardOpenOption.READ)){
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while((bytesRead = sizeStream.read(buffer)) != -1) {fileSize += bytesRead;}
-            } catch(IOException e){
-                throw new RuntimeException("Failed to determine file size", e);
-            }
-        }
-
-        if(fileSize == null) throw new IllegalStateException("File size is null");
-        Long fileSizeLong = fileSize;
-
-        RequestCallback uploadCallback = request -> {
-            HttpHeaders h = request.getHeaders();
-            h.set("X-Goog-Upload-Offset", "0");
-            h.set("X-Goog-Upload-Command", "upload, finalize");
-            h.setContentType(MediaType.parseMediaType(mimeType));
-            h.setContentLength(fileSizeLong);
-            try(InputStream fileStream = Files.newInputStream(originalPath, StandardOpenOption.READ);
-                OutputStream requestStream = request.getBody()) {
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = fileStream.read(buffer)) != -1) requestStream.write(buffer, 0, bytesRead);
-                requestStream.flush();
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to stream file to request", e);
-            }
-        };
-        ResponseExtractor<String> responseExtractor = clientResp -> {
-            try(InputStream in = clientResp.getBody()) {
-                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            } catch(IOException e) {
-                throw new RuntimeException("Failed to read response body", e);
-            }
-        };
-        restTemplate.execute(uploadUrl, HttpMethod.POST, uploadCallback, responseExtractor);
-
-        ResponseEntity<String> info = restTemplate.getForEntity(uploadUrl.replace("/upload/", "/"), String.class);
-        String body = info.getBody();
-
-        int idx = body.indexOf("\"uri\":\"");
-        if (idx == -1) throw new IllegalStateException("No URI found in response body");
-        String uri = body.substring(idx + 7, body.indexOf("\"", idx + 7));
+        String uri = responseBody.substring(idx + 7, responseBody.indexOf("\"", idx + 7));
         return uri;
     }
 
