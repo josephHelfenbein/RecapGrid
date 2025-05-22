@@ -182,6 +182,7 @@ public class App {
         }
         String userId = video.getUserId();
         Path gcsTempDir = Paths.get("/mnt/gcs", "temp", userId, UUID.randomUUID().toString());
+        String errorMessage = "";
         ResponseEntity<Processed> result;
         try {
             updateInfo(userId, "Creating temp directory...", "Processing video...");
@@ -488,9 +489,11 @@ public class App {
         } catch (IOException e) {
             logger.error("IO error while processing video: {}", video.getFileName(), e);
             result = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            errorMessage = e.getMessage();
         } catch (Exception e) {
             logger.error("Error while processing video: {}", video.getFileName(), e);
             result = ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            errorMessage = e.getMessage();
         } finally {
             updateInfo(userId, "Cleaning up temp files...", "Processing video...");
             try {
@@ -502,7 +505,8 @@ public class App {
                     }
                 });
                 logger.info("Cleaned up temp directory: {}", gcsTempDir);
-                updateInfo(userId, "", "Video processed successfully");
+                if(errorMessage=="") updateInfo(userId, "", "Video processed successfully");
+                else updateInfo(userId, errorMessage, "There was an error processing the video");
             } catch (IOException e){
                 logger.error("Error cleaning up temp directory: {}", gcsTempDir, e);
             }
