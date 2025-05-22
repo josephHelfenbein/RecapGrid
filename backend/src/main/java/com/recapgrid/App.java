@@ -272,7 +272,7 @@ public class App {
                     Map.of("text", promptBuilder.toString()),
                     Map.of("file_data", Map.of(
                         "mime_type", "video/mp4",
-                        "uri", geminiUploadPath
+                        "file_uri", geminiUploadPath
                     ))
                 )
             );
