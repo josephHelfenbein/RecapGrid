@@ -528,7 +528,7 @@ public class App {
         long minutes = (ms % 3_600_000) / 60_000;
         long seconds = (ms % 60_000) / 1_000;
         long millis = ms % 1_000;
-        return String.format("%02d:%02d:%02d,%03d", hours, minutes, seconds, millis);
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, millis);
     }
 
     private String formatSrtDuration(Duration duration) {
@@ -537,7 +537,7 @@ public class App {
         long minutes = (ms % 3_600_000) / 60_000;
         long seconds = (ms % 60_000) / 1_000;
         long millis = ms % 1_000;
-        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, millis);
+        return String.format("%02d:%02d:%02d,%03d", hours, minutes, seconds, millis);
     }
 
     private String normalizeSrtTime(String ts){
