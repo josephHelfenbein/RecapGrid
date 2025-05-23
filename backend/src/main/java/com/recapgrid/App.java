@@ -532,8 +532,7 @@ public class App {
             .replaceAll("[^a-z0-9-]", "-")
             .replaceAll("^-+", "")
             .replaceAll("-+$", "");
-        if (sanitizedDisplayName.length() > 40) sanitizedDisplayName = sanitizedDisplayName.substring(0, 40);
-        String metadata = String.format("{\"file\":{\"name\":\"%s\",\"display_name\":\"%s\"}}", sanitizedDisplayName, sanitizedDisplayName);
+        String metadata = "{\"file\":{\"display_name\":\"" + sanitizedDisplayName + "\"}}";
 
         HttpHeaders startHeaders = new HttpHeaders();
         startHeaders.setContentType(MediaType.APPLICATION_JSON);
@@ -586,9 +585,10 @@ public class App {
     private void waitForFileActive(String fileName) throws Exception{
         ObjectMapper mapper = new ObjectMapper();
         String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
-        String pollUrl = "https://generativelanguage.googleapis.com/v1beta/files/" + encodedName + "?key=" + geminiKey;
+        String pollUrl = "https://generativelanguage.googleapis.com/v1beta/" + encodedName + "?key=" + geminiKey;
         for(int i=0; i<50; i++){
             String body = restTemplate.getForObject(pollUrl, String.class);
+            System.out.println("Poll response: " + body);
             String state = mapper.readTree(body).path("file").path("state").asText("");
             if(state.equalsIgnoreCase("ACTIVE")) return;
             Thread.sleep(500);
