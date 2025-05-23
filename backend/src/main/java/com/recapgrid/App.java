@@ -240,17 +240,18 @@ public class App {
 
             ObjectMapper generateMapper = new ObjectMapper();
             Map<String, Object> generationConfig = Map.of(
-                "responseMimeType", "application/json",
-                "responseSchema", Map.of(
-                    "type", "ARRAY",
-                    "items", Map.of(
-                        "type", "OBJECT",
-                        "properties", Map.of(
-                            "timestamps", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
-                            "narration", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
-                        )
+                "type", "object",
+                "properties", Map.of(
+                    "timestamps", Map.of(
+                    "type",  "array",
+                    "items", Map.of("type","string")
+                    ),
+                    "narration", Map.of(
+                    "type",  "array",
+                    "items", Map.of("type","string")
                     )
-                )
+                ),
+                "required", List.of("timestamps","narration")
             );
 
             String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + geminiKey;
@@ -268,7 +269,8 @@ public class App {
             );
             Map<String, Object> requestBody = Map.of(
                 "contents", List.of(contents),
-                "generationConfig", generationConfig
+                "structured_output", Map.of("schema", generationConfig),
+                "response_mime_type", "application/json"
             );
             String requestJson = generateMapper.writeValueAsString(requestBody);
 
