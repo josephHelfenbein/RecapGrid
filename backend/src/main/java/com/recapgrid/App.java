@@ -237,23 +237,11 @@ public class App {
                 promptBuilder.append("3. Speak each narration in a ").append(voice.toLowerCase())
                             .append(" voice. Do NOT include timestamps inside the narration text.\n");
             else promptBuilder.append("3. Do not include any voice/style directive; just return the narration text.\n");
-            
-            promptBuilder.append("4. Return ONLY the following JSON object (no extra commentary):\n")
-                .append("{\n")
-                .append("  \"timestamps\": [\"0:00-0:05\", \"0:10-0:15\", \"0:20-0:25\", \"0:30-0:35\", \"0:40-0:45\"],\n")
-                .append("  \"narrations\": [\n")
-                .append("    \"First, we dive in with a bang—watch how this simple test changes everything.\",\n")
-                .append("    \"Now, the plot twists: you won’t believe the hack that makes it 10× faster.\",\n")
-                .append("    \"At the midway mark, an epic showdown of technique versus tool ensues.\",\n")
-                .append("    \"Here’s the climax—when theory meets practice in a dazzling display.\",\n")
-                .append("    \"Finally, we wrap up with the key takeaway that’ll level up your workflow.\"\n")
-                .append("  ]\n")
-                .append("}");
 
             ObjectMapper generateMapper = new ObjectMapper();
             Map<String, Object> generationConfig = Map.of(
-                "response_mime_type", "application/json",
-                "response_schema", Map.of(
+                "responseMimeType", "application/json",
+                "responseSchema", Map.of(
                     "type", "ARRAY",
                     "items", Map.of(
                         "type", "OBJECT",
