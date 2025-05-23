@@ -32,6 +32,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RequestCallback;
 import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
@@ -585,12 +586,20 @@ public class App {
     private void waitForFileActive(String fileName) throws Exception{
         ObjectMapper mapper = new ObjectMapper();
         String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
+        logger.info("Waiting for file to become active: {}", encodedName);
         String pollUrl = "https://generativelanguage.googleapis.com/v1beta/" + encodedName + "?key=" + geminiKey;
         for(int i=0; i<50; i++){
-            String body = restTemplate.getForObject(pollUrl, String.class);
-            System.out.println("Poll response: " + body);
-            String state = mapper.readTree(body).path("file").path("state").asText("");
-            if(state.equalsIgnoreCase("ACTIVE")) return;
+            try {
+                String body = restTemplate.getForObject(pollUrl, String.class);
+                logger.info("Polled body = {}", body);
+                String state = mapper.readTree(body).path("state").asText("");
+                if ("ACTIVE".equalsIgnoreCase(state)) {
+                    logger.info("File is now ACTIVE");
+                    return;
+                }
+            } catch (HttpClientErrorException.NotFound nf) {
+                logger.debug("File not found yet, retrying…");
+            }
             Thread.sleep(500);
         }
         throw new IllegalStateException("File never became active");
