@@ -585,9 +585,8 @@ public class App {
 
     private void waitForFileActive(String fileName) throws Exception{
         ObjectMapper mapper = new ObjectMapper();
-        String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
-        logger.info("Waiting for file to become active: {}", encodedName);
-        String pollUrl = "https://generativelanguage.googleapis.com/v1beta/" + encodedName + "?key=" + geminiKey;
+        logger.info("Waiting for file to become active: {}", fileName);
+        String pollUrl = "https://generativelanguage.googleapis.com/v1beta/" + fileName + "?key=" + geminiKey;
         for(int i=0; i<50; i++){
             try {
                 String body = restTemplate.getForObject(pollUrl, String.class);
