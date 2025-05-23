@@ -237,21 +237,38 @@ public class App {
                 promptBuilder.append("3. Speak each narration in a ").append(voice.toLowerCase())
                             .append(" voice. Do NOT include timestamps inside the narration text.\n");
             else promptBuilder.append("3. Do not include any voice/style directive; just return the narration text.\n");
+            
+            promptBuilder.append("4. Return ONLY the following JSON object (no extra commentary):\n")
+                .append("{\n")
+                .append("  \"timestamps\": [\"0:00-0:05\", \"0:10-0:15\", \"0:20-0:25\", \"0:30-0:35\", \"0:40-0:45\"],\n")
+                .append("  \"narrations\": [\n")
+                .append("    \"First, we dive in with a bang—watch how this simple test changes everything.\",\n")
+                .append("    \"Now, the plot twists: you won’t believe the hack that makes it 10× faster.\",\n")
+                .append("    \"At the midway mark, an epic showdown of technique versus tool ensues.\",\n")
+                .append("    \"Here’s the climax—when theory meets practice in a dazzling display.\",\n")
+                .append("    \"Finally, we wrap up with the key takeaway that’ll level up your workflow.\"\n")
+                .append("  ]\n")
+                .append("}");
 
             ObjectMapper generateMapper = new ObjectMapper();
-            Map<String, Object> generationConfig = Map.of(
+            Map<String, Object> schema = Map.of(
                 "type", "object",
                 "properties", Map.of(
                     "timestamps", Map.of(
-                    "type",  "array",
-                    "items", Map.of("type","string")
+                        "type", "array",
+                        "items", Map.of("type", "string")
                     ),
-                    "narration", Map.of(
-                    "type",  "array",
-                    "items", Map.of("type","string")
+                    "narrations", Map.of(
+                        "type", "array",
+                        "items", Map.of("type", "string")
                     )
                 ),
-                "required", List.of("timestamps","narration")
+                "required", List.of("timestamps", "narrations")
+            );
+
+            Map<String, Object> generationConfig = Map.of(
+                "responseMimeType", "application/json",
+                "structuredOutput", Map.of("schema", schema)
             );
 
             String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + geminiKey;
@@ -269,8 +286,7 @@ public class App {
             );
             Map<String, Object> requestBody = Map.of(
                 "contents", List.of(contents),
-                "structured_output", Map.of("schema", generationConfig),
-                "response_mime_type", "application/json"
+                "generationConfig", generationConfig
             );
             String requestJson = generateMapper.writeValueAsString(requestBody);
 
