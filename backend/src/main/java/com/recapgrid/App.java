@@ -527,7 +527,7 @@ public class App {
                 throw new RuntimeException("Failed to determine file size", ex);
             }
         }
-        String metadata = "{\"file\":{\"display_name\":\"" + UUID.randomUUID().toString().substring(0, 10) + "\"}}";
+        String metadata = "{\"file\":{\"display_name\":\"" + video.getFileName() + "\"}}";
 
         HttpHeaders startHeaders = new HttpHeaders();
         startHeaders.setContentType(MediaType.APPLICATION_JSON);
@@ -565,9 +565,12 @@ public class App {
 
         try{
             JsonNode root = new ObjectMapper().readTree(finalizeJson);
+            String fullName = root.path("file").path("name").asText(null);
+            String[] segments = fullName.split("/");
+            String fileId = segments[segments.length-1];
             String fileUri = root.path("file").path("uri").asText(null);
             if(fileUri == null) throw new IllegalStateException("No file URI returned");
-            waitForFileActive(fileUri);
+            waitForFileActive(fileId);
             return fileUri;
         } catch(IOException e){
             throw new RuntimeException("Failed to parse finalize JSON", e);
