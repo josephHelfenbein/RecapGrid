@@ -299,7 +299,7 @@ public class App {
                 logger.error("Empty response from Gemini.");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            logger.info("Received response from Gemini", responseBody);
+            logger.info("Response body: {}", responseBody);
 
             ObjectMapper readMapper = new ObjectMapper();
             JsonNode root = readMapper.readTree(responseBody);
