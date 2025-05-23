@@ -581,7 +581,7 @@ public class App {
         ObjectMapper mapper = new ObjectMapper();
         String base = "https://generativelanguage.googleapis.com/v1beta/files/";
         String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
-        String pollUrl = baseUrl + "?name=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8) + "&key="  + geminiKey;
+        String pollUrl = base + "?name=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8) + "&key="  + geminiKey;
         for(int i=0; i<50; i++){
             String body = restTemplate.getForObject(pollUrl, String.class);
             String state = mapper.readTree(body).path("file").path("state").asText("");
