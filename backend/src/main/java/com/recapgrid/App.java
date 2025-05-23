@@ -527,7 +527,7 @@ public class App {
                 throw new RuntimeException("Failed to determine file size", ex);
             }
         }
-        String metadata = "{\"file\":{\"display_name\":\"" + video.getFileName() + "\"}}";
+        String metadata = "{\"file\":{\"display_name\":\"" + UUID.randomUUID().toString().substring(0, 10) + "\"}}";
 
         HttpHeaders startHeaders = new HttpHeaders();
         startHeaders.setContentType(MediaType.APPLICATION_JSON);
