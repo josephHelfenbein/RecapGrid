@@ -527,9 +527,13 @@ public class App {
                 throw new RuntimeException("Failed to determine file size", ex);
             }
         }
-        int nameLength = URLEncoder.encode(video.getFileName().toLowerCase(), StandardCharsets.UTF_8).length();
-        if(nameLength > 20) nameLength = 20;
-        String metadata = "{\"file\":{\"display_name\":\"" + URLEncoder.encode(video.getFileName().toLowerCase(), StandardCharsets.UTF_8).substring(0, nameLength) + "\"}}";
+        String originalName = video.getFileName();
+        String sanitizedDisplayName = originalName.toLowerCase()
+            .replaceAll("[^a-z0-9-]", "-")
+            .replaceAll("^-+", "")
+            .replaceAll("-+$", "");
+        if (sanitizedDisplayName.length() > 40) sanitizedDisplayName = sanitizedDisplayName.substring(0, 40);
+        String metadata = "{\"file\":{\"display_name\":\"" + sanitizedDisplayName + "\"}}";
 
         HttpHeaders startHeaders = new HttpHeaders();
         startHeaders.setContentType(MediaType.APPLICATION_JSON);
