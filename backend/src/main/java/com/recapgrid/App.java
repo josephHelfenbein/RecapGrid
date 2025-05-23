@@ -251,27 +251,27 @@ public class App {
                 .append("}");
 
             ObjectMapper generateMapper = new ObjectMapper();
-            Map<String, Object> schema = Map.of(
+            Map<String,Object> schema = Map.of(
                 "type", "object",
                 "properties", Map.of(
                     "timestamps", Map.of(
-                        "type", "array",
-                        "items", Map.of("type", "string")
+                    "type",  "array",
+                    "items", Map.of("type","string")
                     ),
                     "narrations", Map.of(
-                        "type", "array",
-                        "items", Map.of("type", "string")
+                    "type",  "array",
+                    "items", Map.of("type","string")
                     )
                 ),
-                "required", List.of("timestamps", "narrations")
+                "required", List.of("timestamps","narrations")
             );
 
-            Map<String, Object> generationConfig = Map.of(
-                "responseMimeType", "application/json",
-                "structuredOutput", Map.of("schema", schema)
+            Map<String,Object> generationConfig = Map.of(
+                "response_mime_type", "application/json",
+                "response_schema",   schema
             );
 
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + geminiKey;
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiKey;
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
