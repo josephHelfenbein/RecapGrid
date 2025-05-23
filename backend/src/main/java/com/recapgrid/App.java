@@ -566,11 +566,9 @@ public class App {
         try{
             JsonNode root = new ObjectMapper().readTree(finalizeJson);
             String fullName = root.path("file").path("name").asText(null);
-            String[] segments = fullName.split("/");
-            String fileId = segments[segments.length-1];
             String fileUri = root.path("file").path("uri").asText(null);
             if(fileUri == null) throw new IllegalStateException("No file URI returned");
-            waitForFileActive(fileId);
+            waitForFileActive(fullName);
             return fileUri;
         } catch(IOException e){
             throw new RuntimeException("Failed to parse finalize JSON", e);
@@ -580,16 +578,13 @@ public class App {
     }
 
     private void waitForFileActive(String fileName) throws Exception{
-        String fileId = fileName.startsWith("files/")
-        ? fileName.substring("files/".length())
-        : fileName;
         ObjectMapper mapper = new ObjectMapper();
-        String url = "https://generativelanguage.googleapis.com/v1beta/files/"
-                   + URLEncoder.encode(fileId, "UTF-8")
-                   + "?key=" + geminiKey;
-        for(int i=0; i<10; i++){
-            String body = restTemplate.getForObject(url, String.class);
-            String state = mapper.readTree(body).path("file").path("state").asText();
+        String base = "https://generativelanguage.googleapis.com/v1beta/files/";
+        String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8);
+        String pollUrl = base + encodedName + "?key=" + geminiKey;
+        for(int i=0; i<50; i++){
+            String body = restTemplate.getForObject(pollUrl, String.class);
+            String state = mapper.readTree(body).path("file").path("state").asText("");
             if(state.equalsIgnoreCase("ACTIVE")) return;
             Thread.sleep(500);
         }
