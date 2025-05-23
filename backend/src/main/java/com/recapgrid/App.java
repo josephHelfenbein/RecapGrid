@@ -299,7 +299,7 @@ public class App {
                 logger.error("Empty response from Gemini.");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            logger.info("Received response from Gemini");
+            logger.info("Received response from Gemini", responseBody);
 
             ObjectMapper readMapper = new ObjectMapper();
             JsonNode root = readMapper.readTree(responseBody);
@@ -599,7 +599,7 @@ public class App {
             } catch (HttpClientErrorException.NotFound nf) {
                 logger.debug("File not found yet, retrying…");
             }
-            Thread.sleep(500);
+            Thread.sleep(1000);
         }
         throw new IllegalStateException("File never became active");
     }
