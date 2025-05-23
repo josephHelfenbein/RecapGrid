@@ -533,7 +533,7 @@ public class App {
             .replaceAll("^-+", "")
             .replaceAll("-+$", "");
         if (sanitizedDisplayName.length() > 40) sanitizedDisplayName = sanitizedDisplayName.substring(0, 40);
-        String metadata = "{\"file\":{\"display_name\":\"" + sanitizedDisplayName + "\"}}";
+        String metadata = String.format("{\"file\":{\"name\":\"%s\",\"display_name\":\"%s\"}}", sanitizedDisplayName, sanitizedDisplayName);
 
         HttpHeaders startHeaders = new HttpHeaders();
         startHeaders.setContentType(MediaType.APPLICATION_JSON);
