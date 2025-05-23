@@ -587,7 +587,7 @@ public class App {
         String url = "https://generativelanguage.googleapis.com/v1beta/files/"
                    + URLEncoder.encode(fileId, "UTF-8")
                    + "?key=" + geminiKey;
-        for(int i=0; i<10; i++){
+        for(int i=0; i<50; i++){
             String body = restTemplate.getForObject(url, String.class);
             String state = mapper.readTree(body).path("file").path("state").asText();
             if(state.equalsIgnoreCase("ACTIVE")) return;
