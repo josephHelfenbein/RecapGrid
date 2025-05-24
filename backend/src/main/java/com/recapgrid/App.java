@@ -219,36 +219,25 @@ public class App {
 
             StringBuilder promptBuilder = new StringBuilder();
             promptBuilder.append("You are a video‐editing assistant that produces both key clip timestamps and matching narration in JSON form.\n")
-                .append("1. First, list exactly 5 (up to 6) meaningful timestamp ranges where the video’s most important events happen, formatted as [\"M:SS–M:SS\"]. ")
+                .append("1. First, list around 8-10 meaningful timestamp ranges where the video’s most important events happen, formatted as [\"M:SS–M:SS\"]. ")
                 .append("Distribute these ranges evenly from beginning to end—cover intro, build-up, midpoint twist, climax, and conclusion. ")
                 .append("Do not cluster them all at the start.\n")
                 .append("2. Then, write one short narration line for each timestamp range (so narration array length = timestamps array length. It MUST be equal, PAY ATTENTION to this). ")
-                .append("Each line must be 1–2 sentences, focused strictly on what happens inside that clip. Make sure the narrations also have a build-up, twist, and conclusion. ");
+                .append("Each line must be 1–2 sentences, focused strictly ONLY on what happens inside THAT timestamp range. Make sure the narrations also have a build-up, twist, and conclusion, and not in a corny way, but in a natural and satisfying way.\n");
 
             if (feel.equalsIgnoreCase("funny")) 
-                promptBuilder.append("Use genuine humor—craft witty punchlines, playful contrasts, or unexpected twists that earn a real laugh (not just “LOL”). Use modern slang and random funny comments.\n");
+                promptBuilder.append("Use genuine humor—craft witty punchlines, playful contrasts, or unexpected twists that earn a real laugh (not just “LOL”). Use modern slang and random funny comments, and be careful to avoid being corny.\n");
             else if (feel.equalsIgnoreCase("cinematic")) 
-                promptBuilder.append("Adopt a movie-trailer style—build suspense, use dramatic pacing, teaser phrases like “coming up,” and evoke big-screen excitement.\n");
+                promptBuilder.append("Adopt a movie-trailer style—build suspense, use dramatic pacing, teaser phrases like “coming up,” and evoke big-screen excitement. It should feel like a movie trailer.\n");
             else if (feel.equalsIgnoreCase("informational")) 
-                promptBuilder.append("Adopt an educational tone—clearly explain or teach a key takeaway or concept, turning each clip into a short mini-lesson.\n");
-            else promptBuilder.append("Blend humor, cinematic flair, and clear teaching points.\n");
-            
+                promptBuilder.append("Adopt an educational tone—clearly explain or teach a key takeaway or concept, turning each clip into a short mini-lesson. It should feel like a TED talk.\n");
+
             if (!voice.equalsIgnoreCase("none")) 
                 promptBuilder.append("3. Speak each narration in a ").append(voice.toLowerCase())
                             .append(" voice. Do NOT include timestamps inside the narration text.\n");
             else promptBuilder.append("3. Do not include any voice/style directive; just return the narration text.\n");
             
-            promptBuilder.append("4. Return ONLY the following JSON object (no extra commentary):\n")
-                .append("{\n")
-                .append("  \"timestamps\": [\"0:00-0:05\", \"0:10-0:15\", \"0:20-0:25\", \"0:30-0:35\", \"0:40-0:45\"],\n")
-                .append("  \"narrations\": [\n")
-                .append("    \"First, we dive in with a bang—watch how this simple test changes everything.\",\n")
-                .append("    \"Now, the plot twists: you won’t believe the hack that makes it 10× faster.\",\n")
-                .append("    \"At the midway mark, an epic showdown of technique versus tool ensues.\",\n")
-                .append("    \"Here’s the climax—when theory meets practice in a dazzling display.\",\n")
-                .append("    \"Finally, we wrap up with the key takeaway that’ll level up your workflow.\"\n")
-                .append("  ]\n")
-                .append("}");
+            promptBuilder.append("4. Return ONLY the following JSON object (no extra commentary):\n");
 
             ObjectMapper generateMapper = new ObjectMapper();
             Map<String,Object> schema = Map.of(
@@ -594,10 +583,9 @@ public class App {
         ObjectMapper mapper = new ObjectMapper();
         logger.info("Waiting for file to become active: {}", fileName);
         String pollUrl = "https://generativelanguage.googleapis.com/v1beta/" + fileName + "?key=" + geminiKey;
-        for(int i=0; i<50; i++){
+        for(int i=0; i<60; i++){
             try {
                 String body = restTemplate.getForObject(pollUrl, String.class);
-                logger.info("Polled body = {}", body);
                 String state = mapper.readTree(body).path("state").asText("");
                 if ("ACTIVE".equalsIgnoreCase(state)) {
                     logger.info("File is now ACTIVE");
