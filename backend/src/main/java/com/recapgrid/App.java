@@ -313,9 +313,10 @@ public class App {
             JsonNode partsNode = root.path("candidates").get(0).path("content").path("parts");
             String textContent = partsNode.get(0).path("text").asText();
 
-            ArrayNode structured = (ArrayNode) readMapper.readTree(textContent);
+            JsonNode structured = readMapper.readTree(textContent);
 
-            JsonNode timestampsNode = structured.get(0).path("timestamps");
+            JsonNode timestampsNode = structured.path("timestamps");
+            
             if (!timestampsNode.isArray()) throw new IllegalStateException("Expected timestamps array, got: " + timestampsNode);
             
             List<Path> segmentPaths = new ArrayList<>();
@@ -323,7 +324,7 @@ public class App {
             JsonNode narrationsNode = null;
             SsmlVoiceGender ssmlGender = voice.equalsIgnoreCase("female") ? SsmlVoiceGender.FEMALE : voice.equalsIgnoreCase("male") ? SsmlVoiceGender.MALE : SsmlVoiceGender.NEUTRAL;
             if(!voice.equalsIgnoreCase("none")){
-                narrationsNode = structured.get(1).path("narration");
+                narrationsNode = structured.path("narrations");
                 if (!narrationsNode.isArray()) throw new IllegalStateException("Expected narration array, got: " + narrationsNode);
                 if (narrationsNode.size() != timestampsNode.size()) {
                     logger.error("Mismatch between timestamps and narration sizes: {} vs {}", timestampsNode.size(), narrationsNode.size());
