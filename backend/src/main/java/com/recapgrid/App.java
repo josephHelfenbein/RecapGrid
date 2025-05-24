@@ -218,12 +218,12 @@ public class App {
             updateInfo(userId, "Generating video summary...", "Processing video...");
 
             StringBuilder promptBuilder = new StringBuilder();
-            promptBuilder.append("You are a video‐editing assistant that produces both key clip timestamps and matching narration in JSON form.\n")
-                .append("1. First, list around 8-10 meaningful timestamp ranges where the video’s most important events happen, formatted as [\"M:SS–M:SS\"]. ")
+            promptBuilder.append("You are a video-editing assistant that produces both key clip timestamps and matching narration in JSON form.\n")
+                .append("1. First, list around 8-10 meaningful timestamp ranges where the video's most important events happen, formatted as [\"M:SS-M:SS\"]. ")
                 .append("Distribute these ranges evenly from beginning to end—cover intro, build-up, midpoint twist, climax, and conclusion. ")
                 .append("Do not cluster them all at the start.\n")
                 .append("2. Then, write one short narration line for each timestamp range (so narration array length = timestamps array length. It MUST be equal, PAY ATTENTION to this). ")
-                .append("Each line must be 1–2 sentences, focused strictly ONLY on what happens inside THAT timestamp range. Make sure the narrations also have a build-up, twist, and conclusion, and not in a corny way, but in a natural and satisfying way.\n");
+                .append("Each line must be 1-2 sentences, focused strictly ONLY on what happens inside THAT timestamp range. Make sure the narrations also have a build-up, twist, and conclusion, and not in a corny way, but in a natural and satisfying way.\n");
 
             if (feel.equalsIgnoreCase("funny")) 
                 promptBuilder.append("Use genuine humor—craft witty punchlines, playful contrasts, or unexpected twists that earn a real laugh (not just “LOL”). Use modern slang and random funny comments, and be careful to avoid being corny.\n");
