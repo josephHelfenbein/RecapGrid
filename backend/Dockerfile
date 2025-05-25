@@ -19,6 +19,8 @@ WORKDIR /app
 
 COPY --from=builder /build/target/*.jar app.jar
 
+COPY src/main/resources/music /app/music
+
 EXPOSE 8080
 
 CMD ["java", "-Dserver.port=8080", "-jar", "/app/app.jar"]
