@@ -247,7 +247,7 @@ public class App {
                     "type",  "integer"
                     )
                 ),
-                "required", List.of("timestamps","narrations")
+                "required", List.of("timestamps","narrations", "music")
             );
 
             Map<String,Object> generationConfig = Map.of(
@@ -316,13 +316,13 @@ public class App {
                 }
             }
 
-            JsonNode musicNode = structured.path("music");
+            JsonNode musicNode = structured.get("music");
 
-            if (musicNode.isNull()) {
+            if (musicNode == null || musicNode.isMissingNode()) {
                 logger.error("Music node is null");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
-            int musicIndex = musicNode.asInt();
+            int musicIndex = musicNode.intValue();
             String musicChoice = switch (musicIndex) {
                 case 0 -> "/app/music/action.wav";
                 case 1 -> "/app/music/interesting.wav";
