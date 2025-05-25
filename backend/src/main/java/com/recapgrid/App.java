@@ -244,8 +244,7 @@ public class App {
                     "items", Map.of("type","string")
                     ),
                     "music", Map.of(
-                    "type",  "integer",
-                    "enum", List.of(0,1,2,3,4)
+                    "type",  "integer"
                     )
                 ),
                 "required", List.of("timestamps","narrations")
