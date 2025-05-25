@@ -19,6 +19,9 @@
             <option value="none">No narration</option>
             </select>
 
+            <label class="block text-sm font-medium mb-1">Add music</label>
+            <input type="checkbox" v-model="addMusic" class="mb-3" />
+
             <div class="flex justify-end space-x-2 mt-4">
             <button @click="closePopup" class="px-4 py-2 text-primary bg-secondary rounded">Cancel</button>
             <button @click="processVideo" class="px-4 py-2 text-primary-foreground bg-primary rounded">Process Video</button>
@@ -34,7 +37,7 @@
   const isOpen = ref(false)
   const selectedFeel = ref('cinematic')
   const selectedVoice = ref('male')
-  const selectedAspectRatio = ref('9:16')
+  const addMusic = ref(true)
   
   const emit = defineEmits(['submit'])
   
@@ -45,6 +48,7 @@
     emit('submit', {
       feel: selectedFeel.value,
       voice: selectedVoice.value,
+      music: addMusic.value,
     })
     closePopup()
   }

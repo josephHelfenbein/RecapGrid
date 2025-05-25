@@ -298,6 +298,7 @@
     const queryParams = new URLSearchParams({
       voice: data.voice,
       feel: data.feel,
+      music: data.music,
       userId: fileToProcess.value.userId,
     });
     try{

@@ -175,7 +175,7 @@ public class App {
     }
 
     @PostMapping("/processVideo")
-    public ResponseEntity<Processed> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel) {
+    public ResponseEntity<Processed> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel, @RequestParam boolean music) {
         if (video == null) {
             logger.error("Processed object is null.");
             return ResponseEntity.badRequest().body(null);
@@ -485,32 +485,35 @@ public class App {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
                 }
             }
-            updateInfo(userId, "Adding music...", "Processing video...");
-            
+
             Path finalPath = gcsTempDir.resolve("final-" + UUID.randomUUID() + ".mp4");
-
-            ProcessBuilder musicProcessBuilder = new ProcessBuilder(
-                "ffmpeg", "-y",
-                "-i", output.toString(),
-                "-i", musicChoice,
-                "-filter_complex",
-                    "[1:a]volume=0.3[m];" +
-                    "[0:a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]",
-                "-map", "0:v",
-                "-map", "[aout]",
-                "-c:v","copy",
-                "-c:a","aac","-b:a","192k","-ar","44100",
-                "-movflags","+faststart",
-                "-shortest",
-                finalPath.toString()
-            );
-            musicProcessBuilder.inheritIO();
-            int musicCode = musicProcessBuilder.start().waitFor();
-            if (musicCode != 0) {
-                logger.error("Error adding music - Code: {}", musicCode);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            if(music){
+                updateInfo(userId, "Adding music...", "Processing video...");
+                
+                ProcessBuilder musicProcessBuilder = new ProcessBuilder(
+                    "ffmpeg", "-y",
+                    "-i", output.toString(),
+                    "-i", musicChoice,
+                    "-filter_complex",
+                        "[1:a]volume=0.4[m];" +
+                        "[0:a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]",
+                    "-map", "0:v",
+                    "-map", "[aout]",
+                    "-c:v","copy",
+                    "-c:a","aac","-b:a","192k","-ar","44100",
+                    "-movflags","+faststart",
+                    "-shortest",
+                    finalPath.toString()
+                );
+                musicProcessBuilder.inheritIO();
+                int musicCode = musicProcessBuilder.start().waitFor();
+                if (musicCode != 0) {
+                    logger.error("Error adding music - Code: {}", musicCode);
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
             }
-
+            else finalPath = output;
+            
             updateInfo(userId, "Uploading processed video...", "Processing video...");
             result = uploadProcessed(userId, finalPath.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
 
