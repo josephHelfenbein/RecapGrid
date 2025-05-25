@@ -38,7 +38,7 @@
   <p align="center">
 (Work in Progress)
 
-RecapGrid is an AI‑powered video summarization toolkit that transforms any MP4 into a ready‑to‑share highlight reel. It automatically detects key moments, extracts timestamped clips, generates synchronized AI narration with background music, and stitches everything together—delivering concise, engaging summaries with a single API call.
+RecapGrid is an AI‑powered video summarization tool that transforms any MP4 into a ready‑to‑share highlight reel. It automatically detects key moments, extracts timestamped clips, generates synchronized AI narration with background music, and stitches everything together, delivering concise, engaging summaries with a single press.
 <br />
 <br />
 <a href="https://www.recapgrid.com">Visit</a>
@@ -86,7 +86,7 @@ The backend and frontend currently run in dockerized containers on Google Cloud 
 
 The user system uses Clerk, and it uses Supabase storage for uploading videos. When a video is uploaded, you can process it, and the frontend is updated live for the steps in processing via a Supabase WebSocket.
 
-When a video is processed, it's first downloaded from Supabase to the Google Cloud Storage bucket. Then it's compressed using FFmpeg, and streamed to Google Gemini with base64 encoding with a complex prompt with structured output. Important timestamps and a narration for each timestamp is returned by Gemini. For each timestamp range, FFmpeg is used to make a clip of the footage with the start and end of the timestamp range. Then, a text-to-speech audio is created with the narration, the clip is retimed to match the audio, and the audio replaces the clip's audio. Finally, all of the clips are concatenated, and the final video is saved to Supabase. All of the temp files in the Google Cloud Storage bucket are then deleted. No videos are ever saved to the container's memory, every temp video is written to and read from the bucket.
+When a video is processed, it's first downloaded from Supabase to the Google Cloud Storage bucket. Then it's compressed using FFmpeg, and streamed to Google Gemini with base64 encoding with a complex prompt with structured output. Important timestamps and a narration for each timestamp is returned by Gemini. For each timestamp range, FFmpeg is used to make a clip of the footage with the start and end of the timestamp range. Then, a text-to-speech audio is created with the narration, the clip is retimed to match the audio, and the audio replaces the clip's audio. Finally, all of the clips are concatenated, and the final video is saved to Supabase with the music overlaid. All of the temp files in the Google Cloud Storage bucket are then deleted. No videos are ever saved to the container's memory, every temp video is written to and read from the bucket.
 
 
 
