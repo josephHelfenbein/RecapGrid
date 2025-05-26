@@ -17,6 +17,7 @@ public class WebConfig implements WebMvcConfigurer{
         registry.addInterceptor(clerkAuthInterceptor)
             .addPathPatterns("/api/**")
             .excludePathPatterns("/api/clerk-user")
-            .excludePathPatterns("/api/delete-user");
+            .excludePathPatterns("/api/delete-user")
+            .excludePathPatterns("/api/processVideoWorker");
     }
 }
