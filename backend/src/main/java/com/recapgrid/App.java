@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -121,10 +120,6 @@ public class App {
 
     private RestTemplate restTemplate = new RestTemplate();
 
-    @Bean
-    public static CloudTasksClient cloudTasksClient() throws IOException {
-        return CloudTasksClient.create();
-    }
     public App(CloudTasksClient tasksClient, ObjectMapper queueMapper) {
         this.tasksClient = tasksClient;
         this.queueMapper = queueMapper;
