@@ -122,7 +122,7 @@ public class App {
     private RestTemplate restTemplate = new RestTemplate();
 
     @Bean
-    public CloudTasksClient cloudTasksClient() throws IOException {
+    public static CloudTasksClient cloudTasksClient() throws IOException {
         return CloudTasksClient.create();
     }
     public App(CloudTasksClient tasksClient, ObjectMapper queueMapper) {
