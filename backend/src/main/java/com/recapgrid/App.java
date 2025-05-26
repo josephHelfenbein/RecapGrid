@@ -221,7 +221,7 @@ public class App {
             "music", music
         ));
         String parent = QueueName.of(projectId, location, gcpQueue).toString();
-        String urlWithParams = workerBaseUrl + "/processVideoWorker?voice=" + URLEncoder.encode(voice, StandardCharsets.UTF_8) + "&feel=" + URLEncoder.encode(feel, StandardCharsets.UTF_8) + "&music=" + music;
+        String urlWithParams = workerBaseUrl + "?voice=" + URLEncoder.encode(voice, StandardCharsets.UTF_8) + "&feel=" + URLEncoder.encode(feel, StandardCharsets.UTF_8) + "&music=" + music;
         com.google.cloud.tasks.v2.HttpRequest req = com.google.cloud.tasks.v2.HttpRequest.newBuilder()
             .setUrl(urlWithParams)
             .setHttpMethod(com.google.cloud.tasks.v2.HttpMethod.POST)
@@ -229,7 +229,7 @@ public class App {
             .setOidcToken(
                 OidcToken.newBuilder()
                     .setServiceAccountEmail(serviceAccount)
-                    .setAudience(workerBaseUrl + "/processVideoWorker")
+                    .setAudience(workerBaseUrl)
                     .build()
             )
             .setBody(ByteString.copyFrom(payload))
@@ -252,7 +252,7 @@ public class App {
             String jwt = authHeader.substring(7);
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier
                 .Builder(new NetHttpTransport(), new GsonFactory())
-                .setAudience(Collections.singletonList(workerBaseUrl + "/processVideoWorker"))
+                .setAudience(Collections.singletonList(workerBaseUrl))
                 .build();
             GoogleIdToken idToken = verifier.verify(jwt);
             if(idToken == null) {
