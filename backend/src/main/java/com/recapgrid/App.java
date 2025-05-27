@@ -274,9 +274,9 @@ public class App {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
             
-            String issuer = idToken.getPayload().getAuthorizedParty();
-            if(!issuer.equals(serviceAccount)) {
-                logger.error("Invalid service account: {}", issuer);
+            String tokenSub = idToken.getPayload().getSubject();
+            if (!serviceAccount.equals(tokenSub)) {
+                logger.error("Unexpected OIDC subject claim: {}", tokenSub);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
