@@ -66,6 +66,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.cloud.tasks.v2.CloudTasksClient;
+import com.google.cloud.tasks.v2.ListTasksRequest;
 import com.google.cloud.tasks.v2.OidcToken;
 import com.google.cloud.tasks.v2.QueueName;
 import com.google.cloud.tasks.v2.Task;
@@ -215,13 +216,26 @@ public class App {
         try{
             logger.info("Queueing video: {}", video.getFileName());
             updateInfo(video.getUserId(), "Queueing video...", "Queueing video...");
+            String userId = video.getUserId();
+            String parent = QueueName.of(projectId, location, gcpQueue).toString();
+            ListTasksRequest listReq = ListTasksRequest.newBuilder()
+                .setParent(parent)
+                .build();
+            for(Task t : tasksClient.listTasks(listReq).iterateAll()){
+                ByteString body = t.getHttpRequest().getBody();
+                if(body != null && body.toStringUtf8().contains("\"userId\":\"" + userId + "\"")){
+                    logger.info("Video already queued for user: {}", userId);
+                    updateInfo(userId, "You already queued a video. Please wait to queue another.", "Queue canceled");
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body("Video already queued for user: " + userId);
+                }
+            }
+
             byte[] payload = queueMapper.writeValueAsBytes(Map.of(
                 "video", video,
                 "voice", voice,
                 "feel", feel,
                 "music", music
             ));
-            String parent = QueueName.of(projectId, location, gcpQueue).toString();
             String urlWithParams = workerBaseUrl + "?voice=" + URLEncoder.encode(voice, StandardCharsets.UTF_8) + "&feel=" + URLEncoder.encode(feel, StandardCharsets.UTF_8) + "&music=" + music;
             logger.info("Creating task with URL: {}", urlWithParams);
             com.google.cloud.tasks.v2.HttpRequest req = com.google.cloud.tasks.v2.HttpRequest.newBuilder()
@@ -242,7 +256,7 @@ public class App {
                 .build();
             Task created = tasksClient.createTask(parent, task);
             logger.info("Task created for video: {}, {}", video.getFileName(), created.getName());
-            updateInfo(video.getUserId(), "Queued.", "Queueing video...");
+            updateInfo(video.getUserId(), "Queued. Waiting for your turn to process.", "Queueing video...");
             return ResponseEntity.accepted().body("Enqueued: " + created.getName());
         } catch (HttpClientErrorException e) {
             logger.error("Error queueing video: {}", video.getFileName(), e);
