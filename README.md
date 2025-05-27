@@ -154,7 +154,7 @@ select
 
 7. Enable Gemini on Google Cloud Platform and add the API key to the backend folder as the `GEMINI_KEY` environment variable.
 
-8. Enable Cloud Tasks API on Google Cloud Platform, and add the project ID to `GCP_PROJECT_ID`, the location to `GCP_BASE_URL`, the service account to `GCP_SERVICE_ACCOUNT`, and the backend URL to `GCP_BASE_URL` environment variables.
+8. Enable Cloud Tasks API on Google Cloud Platform, create a queue named recapgrid-video-queue, and add the project ID to `GCP_PROJECT_ID`, the queue region to `GCP_LOCATION`, the service account email to `GCP_SERVICE_ACCOUNT`, and the backend URL to `GCP_BASE_URL` environment variables.
 
 9. For local, both folders can be run by building and running their Dockerfiles.
 
