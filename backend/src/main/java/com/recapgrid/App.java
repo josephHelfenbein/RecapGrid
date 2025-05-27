@@ -241,8 +241,8 @@ public class App {
                 .setHttpRequest(req)
                 .build();
             Task created = tasksClient.createTask(parent, task);
-            logger.info("Task created for video: {} with ID: {}", video.getFileName(), created.getName());
-            updateInfo(video.getUserId(), "Queued. Your task ID is: " + created.getName(), "Queueing video...");
+            logger.info("Task created for video: {}, {}", video.getFileName(), created.getName());
+            updateInfo(video.getUserId(), "Queued.", "Queueing video...");
             return ResponseEntity.accepted().body("Enqueued: " + created.getName());
         } catch (HttpClientErrorException e) {
             logger.error("Error queueing video: {}", video.getFileName(), e);
@@ -256,8 +256,9 @@ public class App {
     }
 
     @PostMapping("/processVideoWorker")
-    public ResponseEntity<Processed> processVideoWorker(@RequestHeader("Authorization") String authHeader, @RequestBody Map<String, Object> payload, @RequestParam String voice, @RequestParam String feel, @RequestParam boolean music) {
+    public ResponseEntity<Processed> processVideoWorker(@RequestHeader(name="Authorization", required=false) String authHeader, @RequestBody Map<String, Object> payload, @RequestParam String voice, @RequestParam String feel, @RequestParam boolean music) {
         try{
+            logger.info("[worker] called!  authHeader={} voice={} feel={} music={}", authHeader, voice, feel, music);
             if(authHeader == null || !authHeader.startsWith("Bearer ")) {
                 logger.error("Missing or invalid Authorization header");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
