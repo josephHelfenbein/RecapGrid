@@ -88,6 +88,12 @@ The user system uses Clerk, and it uses Supabase storage for uploading videos. W
 When a video is processed, it's first downloaded from Supabase to the Google Cloud Storage bucket. Then it's streamed to Google Gemini with a complex prompt with structured output. Important timestamps, a narration for each timestamp range, and a music choice is returned by Gemini. For each timestamp range, FFmpeg is used to make a clip of the footage with the start and end of the timestamp range. Then, a text-to-speech audio is created with the narration, the clip is retimed to match the audio, and the audio replaces the clip's audio. The retimed timestamp range is used for caption timing. Finally, all of the clips are concatenated, and the final video is saved to Supabase with the music and captions overlaid. All of the temp files in the Google Cloud Storage bucket are then deleted. No videos are ever saved to the container's memory, every temp video is written to and read from the bucket.
 
 
+![systemdiagram1](https://raw.githubusercontent.com/josephHelfenbein/RecapGrid/refs/heads/main/frontend/public/systemdiagram1.png)
+
+
+
+![systemdiagram1](https://raw.githubusercontent.com/josephHelfenbein/RecapGrid/refs/heads/main/frontend/public/systemdiagram2.png)
+
 
 ### Built With
 
