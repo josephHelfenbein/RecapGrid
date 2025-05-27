@@ -274,9 +274,9 @@ public class App {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
             
-            String tokenSub = idToken.getPayload().getSubject();
-            if (!serviceAccount.equals(tokenSub)) {
-                logger.error("Unexpected OIDC subject claim: {}", tokenSub);
+            String tokenEmail = idToken.getPayload().getEmail();
+            if (tokenEmail == null || !tokenEmail.equals(serviceAccount)) {
+                logger.error("Unexpected OIDC email claim: {}", tokenEmail);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
