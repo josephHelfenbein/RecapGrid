@@ -212,33 +212,47 @@ public class App {
         @RequestParam String voice,
         @RequestParam String feel,
         @RequestParam boolean music) throws Exception {
-        updateInfo(video.getUserId(), "Queueing video...", "Queueing video...");
-        byte[] payload = queueMapper.writeValueAsBytes(Map.of(
-            "video", video,
-            "voice", voice,
-            "feel", feel,
-            "music", music
-        ));
-        String parent = QueueName.of(projectId, location, gcpQueue).toString();
-        String urlWithParams = workerBaseUrl + "?voice=" + URLEncoder.encode(voice, StandardCharsets.UTF_8) + "&feel=" + URLEncoder.encode(feel, StandardCharsets.UTF_8) + "&music=" + music;
-        com.google.cloud.tasks.v2.HttpRequest req = com.google.cloud.tasks.v2.HttpRequest.newBuilder()
-            .setUrl(urlWithParams)
-            .setHttpMethod(com.google.cloud.tasks.v2.HttpMethod.POST)
-            .putHeaders("Content-Type", "application/json")
-            .setOidcToken(
-                OidcToken.newBuilder()
-                    .setServiceAccountEmail(serviceAccount)
-                    .setAudience(workerBaseUrl)
-                    .build()
-            )
-            .setBody(ByteString.copyFrom(payload))
-            .build();
-        Task task = Task.newBuilder()
-            .setHttpRequest(req)
-            .build();
-        Task created = tasksClient.createTask(parent, task);
-        updateInfo(video.getUserId(), "Queued. Your task ID is: " + created.getName(), "Queueing video...");
-        return ResponseEntity.accepted().body("Enqueued: " + created.getName());
+        try{
+            logger.info("Queueing video: {}", video.getFileName());
+            updateInfo(video.getUserId(), "Queueing video...", "Queueing video...");
+            byte[] payload = queueMapper.writeValueAsBytes(Map.of(
+                "video", video,
+                "voice", voice,
+                "feel", feel,
+                "music", music
+            ));
+            String parent = QueueName.of(projectId, location, gcpQueue).toString();
+            String urlWithParams = workerBaseUrl + "?voice=" + URLEncoder.encode(voice, StandardCharsets.UTF_8) + "&feel=" + URLEncoder.encode(feel, StandardCharsets.UTF_8) + "&music=" + music;
+            logger.info("Creating task with URL: {}", urlWithParams);
+            com.google.cloud.tasks.v2.HttpRequest req = com.google.cloud.tasks.v2.HttpRequest.newBuilder()
+                .setUrl(urlWithParams)
+                .setHttpMethod(com.google.cloud.tasks.v2.HttpMethod.POST)
+                .putHeaders("Content-Type", "application/json")
+                .setOidcToken(
+                    OidcToken.newBuilder()
+                        .setServiceAccountEmail(serviceAccount)
+                        .setAudience(workerBaseUrl)
+                        .build()
+                )
+                .setBody(ByteString.copyFrom(payload))
+                .build();
+            logger.info("Task request created for video: {}", video.getFileName());
+            Task task = Task.newBuilder()
+                .setHttpRequest(req)
+                .build();
+            Task created = tasksClient.createTask(parent, task);
+            logger.info("Task created for video: {} with ID: {}", video.getFileName(), created.getName());
+            updateInfo(video.getUserId(), "Queued. Your task ID is: " + created.getName(), "Queueing video...");
+            return ResponseEntity.accepted().body("Enqueued: " + created.getName());
+        } catch (HttpClientErrorException e) {
+            logger.error("Error queueing video: {}", video.getFileName(), e);
+            updateInfo(video.getUserId(), "There was an error queueing the video: " + e.getMessage(), "Queueing video...");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error queueing video: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error queueing video: {}", video.getFileName(), e);
+            updateInfo(video.getUserId(), "There was an error queueing the video: " + e.getMessage(), "Queueing video...");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error queueing video: " + e.getMessage());
+        }
     }
 
     @PostMapping("/processVideoWorker")
