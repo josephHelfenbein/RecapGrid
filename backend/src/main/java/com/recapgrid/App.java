@@ -100,7 +100,7 @@ public class App {
     @Value("${gcp.task-queue}")
     private String gcpQueue;
 
-    @Value("${app.worker-base-url}")
+    @Value("${gcp.worker-base-url}")
     private String workerBaseUrl;
 
     @Value("${gcp.service-account}")
