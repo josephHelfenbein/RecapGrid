@@ -256,9 +256,9 @@ public class App {
     }
 
     @PostMapping("/processVideoWorker")
-    public ResponseEntity<Processed> processVideoWorker(@RequestHeader(name="Authorization", required=false) String authHeader, @RequestBody Map<String, Object> payload, @RequestParam String voice, @RequestParam String feel, @RequestParam boolean music) {
+    public ResponseEntity<Processed> processVideoWorker(@RequestHeader(name="Authorization", required=false) String authHeader, @RequestBody Map<String, Object> payload) {
         try{
-            logger.info("[worker] called!  authHeader={} voice={} feel={} music={}", authHeader, voice, feel, music);
+            logger.info("[worker] called!  authHeader={} payload={}", authHeader, payload);
             if(authHeader == null || !authHeader.startsWith("Bearer ")) {
                 logger.error("Missing or invalid Authorization header");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -292,6 +292,9 @@ public class App {
             logger.error("Processed object is null.");
             return ResponseEntity.badRequest().body(null);
         }
+        String voice = (String) payload.get("voice");
+        String feel = (String) payload.get("feel");
+        boolean music = (boolean) payload.get("music");
         String userId = video.getUserId();
         Path gcsTempDir = Paths.get("/mnt/gcs", "temp", userId, UUID.randomUUID().toString());
         String errorMessage = "";
