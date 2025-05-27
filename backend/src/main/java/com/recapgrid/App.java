@@ -3,7 +3,6 @@ package com.recapgrid;
 import com.recapgrid.model.Video;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.recapgrid.model.ClerkUser;
 import com.recapgrid.model.Processed;
 import com.recapgrid.model.StatusEntity;
@@ -15,7 +14,6 @@ import com.recapgrid.repository.UserRepository;
 
 
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.Comparator;
 
@@ -28,9 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
-import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RequestCallback;
@@ -42,12 +37,10 @@ import org.springframework.web.util.UriUtils;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -55,6 +48,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.security.GeneralSecurityException;
 import java.text.Normalizer;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -67,7 +61,15 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 
-import com.google.api.Http;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.cloud.tasks.v2.CloudTasksClient;
+import com.google.cloud.tasks.v2.ListTasksRequest;
+import com.google.cloud.tasks.v2.OidcToken;
+import com.google.cloud.tasks.v2.QueueName;
+import com.google.cloud.tasks.v2.Task;
 import com.google.cloud.texttospeech.v1.*;
 import com.google.protobuf.ByteString;
 
@@ -87,6 +89,24 @@ public class App {
     @Value("${gemini.key}")
     private String geminiKey;
 
+    private final CloudTasksClient tasksClient;
+    private final ObjectMapper queueMapper;
+
+    @Value("${gcp.project-id}")
+    private String projectId;
+
+    @Value("${gcp.location}")
+    private String location;
+
+    @Value("${gcp.task-queue}")
+    private String gcpQueue;
+
+    @Value("${gcp.worker-base-url}")
+    private String workerBaseUrl;
+
+    @Value("${gcp.service-account}")
+    private String serviceAccount;
+
     @Autowired
     private VideoRepository videoRepository;
 
@@ -101,6 +121,10 @@ public class App {
 
     private RestTemplate restTemplate = new RestTemplate();
 
+    public App(CloudTasksClient tasksClient, ObjectMapper queueMapper) {
+        this.tasksClient = tasksClient;
+        this.queueMapper = queueMapper;
+    }
     public static void main(String[] args) {
         SpringApplication.run(App.class, args);
     }
@@ -184,8 +208,102 @@ public class App {
     }
 
     @PostMapping("/processVideo")
-    public ResponseEntity<Processed> processVideo(@RequestBody Video video, @RequestParam String voice, @RequestParam String feel) {
-        if (video == null) {
+    public ResponseEntity<String> processVideo(
+        @RequestBody Video video,
+        @RequestParam String voice,
+        @RequestParam String feel,
+        @RequestParam boolean music) throws Exception {
+        try{
+            logger.info("Queueing video: {}", video.getFileName());
+            updateInfo(video.getUserId(), "Queueing video...", "Queueing video...");
+            String userId = video.getUserId();
+            String parent = QueueName.of(projectId, location, gcpQueue).toString();
+            ListTasksRequest listReq = ListTasksRequest.newBuilder()
+                .setParent(parent)
+                .build();
+            for(Task t : tasksClient.listTasks(listReq).iterateAll()){
+                String queuedUser = t.getHttpRequest().getHeadersMap().get("X-User-Id");
+                if(queuedUser != null && queuedUser.equals(userId)){
+                    logger.info("Video already queued for user: {}", userId);
+                    updateInfo(userId, "You already have a video queued. Wait to process another.", "Queueing canceled.");
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body("Video already queued for this user.");
+                }
+            }
+
+            byte[] payload = queueMapper.writeValueAsBytes(Map.of(
+                "video", video,
+                "voice", voice,
+                "feel", feel,
+                "music", music
+            ));
+            String urlWithParams = workerBaseUrl + "?voice=" + URLEncoder.encode(voice, StandardCharsets.UTF_8) + "&feel=" + URLEncoder.encode(feel, StandardCharsets.UTF_8) + "&music=" + music;
+            logger.info("Creating task with URL: {}", urlWithParams);
+            com.google.cloud.tasks.v2.HttpRequest req = com.google.cloud.tasks.v2.HttpRequest.newBuilder()
+                .setUrl(urlWithParams)
+                .setHttpMethod(com.google.cloud.tasks.v2.HttpMethod.POST)
+                .putHeaders("Content-Type", "application/json")
+                .putHeaders("X-User-Id", video.getUserId())
+                .setOidcToken(
+                    OidcToken.newBuilder()
+                        .setServiceAccountEmail(serviceAccount)
+                        .setAudience(workerBaseUrl)
+                        .build()
+                )
+                .setBody(ByteString.copyFrom(payload))
+                .build();
+            logger.info("Task request created for video: {}", video.getFileName());
+            Task task = Task.newBuilder()
+                .setHttpRequest(req)
+                .build();
+            Task created = tasksClient.createTask(parent, task);
+            logger.info("Task created for video: {}, {}", video.getFileName(), created.getName());
+            updateInfo(video.getUserId(), "Queued. Waiting for your turn to process.", "Queueing video...");
+            return ResponseEntity.accepted().body("Enqueued: " + created.getName());
+        } catch (HttpClientErrorException e) {
+            logger.error("Error queueing video: {}", video.getFileName(), e);
+            updateInfo(video.getUserId(), "There was an error queueing the video: " + e.getMessage(), "Queueing video...");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error queueing video: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error queueing video: {}", video.getFileName(), e);
+            updateInfo(video.getUserId(), "There was an error queueing the video: " + e.getMessage(), "Queueing video...");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error queueing video: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/processVideoWorker")
+    public ResponseEntity<Processed> processVideoWorker(@RequestHeader(name="Authorization", required=false) String authHeader, @RequestBody Map<String, Object> payload, @RequestParam String voice, @RequestParam String feel, @RequestParam boolean music) {
+        try{
+            logger.info("[worker] called!  authHeader={} voice={} feel={} music={}", authHeader, voice, feel, music);
+            if(authHeader == null || !authHeader.startsWith("Bearer ")) {
+                logger.error("Missing or invalid Authorization header");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            String jwt = authHeader.substring(7);
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier
+                .Builder(new NetHttpTransport(), new GsonFactory())
+                .setAudience(Collections.singletonList(workerBaseUrl))
+                .build();
+            GoogleIdToken idToken = verifier.verify(jwt);
+            if(idToken == null) {
+                logger.error("Invalid ID token: {}", jwt);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
+            String tokenEmail = idToken.getPayload().getEmail();
+            if (tokenEmail == null || !tokenEmail.equals(serviceAccount)) {
+                logger.error("Unexpected OIDC email claim: {}", tokenEmail);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+        } catch(GeneralSecurityException e){
+            logger.error("Security error while verifying ID token: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        } catch (IOException e) {
+            logger.error("IO error while verifying ID token: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+        Video video = queueMapper.convertValue(payload.get("video"), Video.class);
+        if(video == null) {
             logger.error("Processed object is null.");
             return ResponseEntity.badRequest().body(null);
         }
@@ -237,7 +355,8 @@ public class App {
                             .append(" voice. Do NOT include timestamps inside the narration text.\n");
             else promptBuilder.append("3. Do not include any voice/style directive; just return the narration text.\n");
             
-            promptBuilder.append("4. Return ONLY the following JSON object (no extra commentary):\n");
+            promptBuilder.append("4. Choose music choices that fit the video style and feel. Only give the index. The choices are 0: \"Action\", 1: \"Interesting\", 2: \"Sad\", 3: \"Spooky\", 4: \"Storytime\".\n");
+            promptBuilder.append("5. Return ONLY the following JSON object (no extra commentary)\n");
 
             ObjectMapper generateMapper = new ObjectMapper();
             Map<String,Object> schema = Map.of(
@@ -250,9 +369,12 @@ public class App {
                     "narrations", Map.of(
                     "type",  "array",
                     "items", Map.of("type","string")
+                    ),
+                    "music", Map.of(
+                    "type",  "integer"
                     )
                 ),
-                "required", List.of("timestamps","narrations")
+                "required", List.of("timestamps","narrations", "music")
             );
 
             Map<String,Object> generationConfig = Map.of(
@@ -320,6 +442,22 @@ public class App {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
                 }
             }
+
+            JsonNode musicNode = structured.get("music");
+
+            if (musicNode == null || musicNode.isMissingNode()) {
+                logger.error("Music node is null");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+            int musicIndex = musicNode.intValue();
+            String musicChoice = switch (musicIndex) {
+                case 0 -> "/app/music/action.wav";
+                case 1 -> "/app/music/interesting.wav";
+                case 2 -> "/app/music/sad.wav";
+                case 3 -> "/app/music/spooky.wav";
+                case 4 -> "/app/music/storytime.wav";
+                default -> throw new IllegalStateException("Unexpected value: " + musicIndex);
+            };
 
             ArrayList<String> newTimestamps = new ArrayList<>();
 
@@ -474,8 +612,37 @@ public class App {
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
                 }
             }
+
+            Path finalPath = gcsTempDir.resolve("final-" + UUID.randomUUID() + ".mp4");
+            if(music){
+                updateInfo(userId, "Adding music...", "Processing video...");
+                
+                ProcessBuilder musicProcessBuilder = new ProcessBuilder(
+                    "ffmpeg", "-y",
+                    "-i", output.toString(),
+                    "-i", musicChoice,
+                    "-filter_complex",
+                        "[1:a]volume=0.4[m];" +
+                        "[0:a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]",
+                    "-map", "0:v",
+                    "-map", "[aout]",
+                    "-c:v","copy",
+                    "-c:a","aac","-b:a","192k","-ar","44100",
+                    "-movflags","+faststart",
+                    "-shortest",
+                    finalPath.toString()
+                );
+                musicProcessBuilder.inheritIO();
+                int musicCode = musicProcessBuilder.start().waitFor();
+                if (musicCode != 0) {
+                    logger.error("Error adding music - Code: {}", musicCode);
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
+            }
+            else finalPath = output;
+            
             updateInfo(userId, "Uploading processed video...", "Processing video...");
-            result = uploadProcessed(userId, output.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
+            result = uploadProcessed(userId, finalPath.toFile(), "processed-" + UUID.randomUUID() + "-" + video.getFileName()); 
 
         } catch (IOException e) {
             logger.error("IO error while processing video: {}", video.getFileName(), e);

@@ -36,9 +36,8 @@
 <h3 align="center">RecapGrid</h3>
 
   <p align="center">
-(Work in Progress)
 
-RecapGrid is an AI‑powered video summarization toolkit that transforms any MP4 into a ready‑to‑share highlight reel. It automatically detects key moments, extracts timestamped clips, generates synchronized AI narration with background music, and stitches everything together—delivering concise, engaging summaries with a single API call.
+RecapGrid is an AI‑powered video summarization tool that transforms any MP4 into a ready‑to‑share highlight reel. It automatically detects key moments, extracts timestamped clips, generates synchronized AI narration with background music, and stitches everything together, delivering concise, engaging summaries with a single press.
 <br />
 <br />
 <a href="https://www.recapgrid.com">Visit</a>
@@ -84,10 +83,16 @@ RecapGrid is an AI‑powered video summarization toolkit that transforms any MP4
 
 The backend and frontend currently run in dockerized containers on Google Cloud Run. The containers are given the appropriate environment variables and the backend has a volume mounted from Google Cloud Storage. 
 
-The user system uses Clerk, and it uses Supabase storage for uploading videos. When a video is uploaded, you can process it, and the frontend is updated live for the steps in processing via a Supabase WebSocket.
+The user system uses Clerk, and it uses Supabase storage for uploading videos. When a video is uploaded, you can process it, and the frontend is updated live for the steps in processing via a Supabase WebSocket. The processing request is sent to Google Cloud Tasks, where it's in a queue. When it's at the front of the queue, it processes the video.
 
-When a video is processed, it's first downloaded from Supabase to the Google Cloud Storage bucket. Then it's compressed using FFmpeg, and streamed to Google Gemini with base64 encoding with a complex prompt with structured output. Important timestamps and a narration for each timestamp is returned by Gemini. For each timestamp range, FFmpeg is used to make a clip of the footage with the start and end of the timestamp range. Then, a text-to-speech audio is created with the narration, the clip is retimed to match the audio, and the audio replaces the clip's audio. Finally, all of the clips are concatenated, and the final video is saved to Supabase. All of the temp files in the Google Cloud Storage bucket are then deleted. No videos are ever saved to the container's memory, every temp video is written to and read from the bucket.
+When a video is processed, it's first downloaded from Supabase to the Google Cloud Storage bucket. Then it's streamed to Google Gemini with a complex prompt with structured output. Important timestamps, a narration for each timestamp range, and a music choice is returned by Gemini. For each timestamp range, FFmpeg is used to make a clip of the footage with the start and end of the timestamp range. Then, a text-to-speech audio is created with the narration, the clip is retimed to match the audio, and the audio replaces the clip's audio. The retimed timestamp range is used for caption timing. Finally, all of the clips are concatenated, and the final video is saved to Supabase with the music and captions overlaid. All of the temp files in the Google Cloud Storage bucket are then deleted. No videos are ever saved to the container's memory, every temp video is written to and read from the bucket.
 
+
+![systemdiagram1](https://raw.githubusercontent.com/josephHelfenbein/RecapGrid/refs/heads/main/frontend/public/systemdiagram1.png)
+
+
+
+![systemdiagram1](https://raw.githubusercontent.com/josephHelfenbein/RecapGrid/refs/heads/main/frontend/public/systemdiagram2.png)
 
 
 ### Built With
@@ -102,6 +107,7 @@ When a video is processed, it's first downloaded from Supabase to the Google Clo
 * [![Supabase][Supabase]][Supabase-url]
 * [![GoogleCloudRun][GoogleCloudRun]][GoogleCloudRun-url]
 * [![GoogleCloudStorage][GoogleCloudStorage]][GoogleCloudStorage-url]
+* [![GoogleCloudTasks][GoogleCloudTasks]][GoogleCloudTasks-url]
 
 
 
@@ -129,20 +135,14 @@ Here are the steps to run the project locally if you want to develop your own pr
 
 1. Fork the repository and host the backend and frontend folders separately on Google Cloud Run, or set up locally.
 
-2. Install packages
-   ```sh
-   cd frontend
-   pnpm install
-   ```
-
-3. Create a Clerk account at [https://clerk.com/](https://clerk.com/), and create a project. Get the API keys `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY`
+2. Create a Clerk account at [https://clerk.com/](https://clerk.com/), and create a project. Get the API keys `NUXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NUXT_CLERK_SECRET_KEY`
     and put them in the environment variables for the frontend folder. Additionally, create webhooks on Clerk, one of them with endpoint {yourdomain}/api/delete-user with a subscribed event of user.deleted, and one of them with endpoint {yourdomain}/api/clerk-user with subscribed events user.created and user.updated. Have the signature keys put in the backend environment variables as `CLERK_WEBHOOK_SECRET_CLERK_USER` and `CLERK_WEBHOOK_SECRET_DELETE_USER`, and the Clerk secret key as `CLERK_SECRET_KEY`.
 
-4. For the frontend folder, put your backend url as `NUXT_PUBLIC_API_BASE` and `NUXT_PUBLIC_API_URL`.
+3. For the frontend folder, put your backend url as `NUXT_PUBLIC_API_BASE` and `NUXT_PUBLIC_API_URL`.
 
-5. Set up Supabase and add tables `users`, `videos`, `processed`, `status`. Videos should have `id bigint int8, file_name character varying varchar, file_url character varying	varchar, uploaded_at timestamp with time zone timestamptz, user_id character varying varchar`, Users should have `id text text, created_at timestamp with time zone	timestamptz, full_name text text, profile_picture text text, email text text`, Processed should have `id bigint int8, file_name character varying varchar, file_url character varying varchar, uploaded_at timestamp with time zone timestamptz, user_id character varying varchar`, and Status should have `id text text, updated_at timestamp with time zone timestamptz, stage text text, info text text, created_at timestamp with time zone timestamptz`. For the frontend folder, put the environment variables `NUXT_PUBLIC_SUPABASE_URL` and `NUXT_PUBLIC_SUPABASE_KEY`, and for the backend folder, environment variables `SUPABASE_URL`, `SUPABASE_KEY`, and the postgres password as `SPRING_DATASOURCE_PASSWORD`.
+4. Set up Supabase and add tables `users`, `videos`, `processed`, `status`. Videos should have `id bigint int8, file_name character varying varchar, file_url character varying	varchar, uploaded_at timestamp with time zone timestamptz, user_id character varying varchar`, Users should have `id text text, created_at timestamp with time zone	timestamptz, full_name text text, profile_picture text text, email text text`, Processed should have `id bigint int8, file_name character varying varchar, file_url character varying varchar, uploaded_at timestamp with time zone timestamptz, user_id character varying varchar`, and Status should have `id text text, updated_at timestamp with time zone timestamptz, stage text text, info text text, created_at timestamp with time zone timestamptz`. For the frontend folder, put the environment variables `NUXT_PUBLIC_SUPABASE_URL` and `NUXT_PUBLIC_SUPABASE_KEY`, and for the backend folder, environment variables `SUPABASE_URL`, `SUPABASE_KEY`, and the postgres password as `SPRING_DATASOURCE_PASSWORD`.
 
-6. A Supabase cron job should be created to remove all videos older than 8 hours. An edge function called `purgeOldVideos` should be created with the code from the `purgeOldVideos.ts` file. The Cron integration in Supabase should be enabled, and a new job should be created to run every hour with the command:
+5. A Supabase cron job should be created to remove all videos older than 8 hours. An edge function called `purgeOldVideos` should be created with the code from the `purgeOldVideos.ts` file. The Cron integration in Supabase should be enabled, and a new job should be created to run every hour with the command:
 ```sql
 select
   net.http_post(
@@ -152,7 +152,9 @@ select
   );
 ```
 
-7. Enable Gemini on Google Cloud Platform and add the API key to the backend folder as `GEMINI_KEY`.
+6. Enable Gemini on Google Cloud Platform and add the API key to the backend folder as the `GEMINI_KEY` environment variable.
+
+7. Enable Cloud Tasks API on Google Cloud Platform, create a queue named recapgrid-video-queue, set its max concurrent dispatches to 1, and add the project ID to `GCP_PROJECT_ID`, the queue region to `GCP_LOCATION`, the service account email to `GCP_SERVICE_ACCOUNT`, and the backend URL to `GCP_BASE_URL` environment variables.
 
 8. For local, both folders can be run by building and running their Dockerfiles.
 
@@ -204,5 +206,7 @@ Distributed under the Apache 2.0 License. See `LICENSE.txt` for more information
 [Supabase-url]: https://supabase.com/
 [GoogleCloudRun]: https://img.shields.io/badge/google%20cloud%20run-4285F4?style=for-the-badge&logo=google%20cloud&logoColor=white
 [GoogleCloudRun-url]: https://cloud.google.com/run
+[GoogleCloudTasks]: https://img.shields.io/badge/google%20cloud%20tasks-4285F4?style=for-the-badge&logo=google%20cloud&logoColor=white
+[GoogleCloudTasks-url]: https://cloud.google.com/tasks/docs
 [GoogleCloudStorage]: https://img.shields.io/badge/google%20cloud%20storage-4285F4?logo=google%20cloud%20storage&style=for-the-badge&logoColor=white
 [GoogleCloudStorage-url]: https://cloud.google.com/storage

@@ -298,6 +298,7 @@
     const queryParams = new URLSearchParams({
       voice: data.voice,
       feel: data.feel,
+      music: data.music,
       userId: fileToProcess.value.userId,
     });
     try{
@@ -315,10 +316,7 @@
           fileUrl: fileToProcess.value.fileUrl,
         }),
       });
-      if (!response.ok) throw new Error(`Processing failed with status ${response.status}`);
-
-      const data = await response.json();
-      videos.value.push(data);
+      if (!response.ok) throw new Error(`Adding to queue failed with status ${response.status}`);
     } catch (error) {
       alertNew("Error processing video:", error);
     }
@@ -333,7 +331,7 @@
         channel = null
       }
       channel = $supabase
-      .channel(`public:status:${newUser.id}`)
+      .channel(`public:status-and-processed:${newUser.id}`)
       .on(
         'postgres_changes',
         {
@@ -345,6 +343,26 @@
         (payload) => {
           console.log('New status:', payload.new)
           alertNewVar(payload.new.info, payload.new.stage)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'processed',
+          filter: `user_id=eq.${newUser.id}`,
+        },
+        (payload) => {
+          console.log('New processed video:', payload.new)
+          const newVideo = {
+            id: payload.new.id,
+            fileUrl: payload.new.file_url,
+            fileName: payload.new.file_name,
+            uploadedAt: payload.new.uploaded_at,
+            userId: payload.new.user_id,
+          }
+          videos.value.push(newVideo);
         }
       )
       .subscribe((status) => {
