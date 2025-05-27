@@ -355,7 +355,7 @@
         },
         (payload) => {
           console.log('New processed video:', payload.new)
-          newVideo = {
+          const newVideo = {
             id: payload.new.id,
             fileUrl: payload.new.file_url,
             fileName: payload.new.file_name,
