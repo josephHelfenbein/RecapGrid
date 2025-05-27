@@ -222,11 +222,11 @@ public class App {
                 .setParent(parent)
                 .build();
             for(Task t : tasksClient.listTasks(listReq).iterateAll()){
-                ByteString body = t.getHttpRequest().getBody();
-                if(body != null && body.toStringUtf8().contains("\"userId\":\"" + userId + "\"")){
+                String queuedUser = t.getHttpRequest().getHeadersMap().get("X-User-Id");
+                if(queuedUser != null && queuedUser.equals(userId)){
                     logger.info("Video already queued for user: {}", userId);
-                    updateInfo(userId, "You already queued a video. Please wait to queue another.", "Queue canceled");
-                    return ResponseEntity.status(HttpStatus.CONFLICT).body("Video already queued for user: " + userId);
+                    updateInfo(userId, "You already have a video queued. Wait to process another.", "Queueing canceled.");
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body("Video already queued for this user.");
                 }
             }
 
@@ -242,6 +242,7 @@ public class App {
                 .setUrl(urlWithParams)
                 .setHttpMethod(com.google.cloud.tasks.v2.HttpMethod.POST)
                 .putHeaders("Content-Type", "application/json")
+                .putHeaders("X-User-Id", video.getUserId())
                 .setOidcToken(
                     OidcToken.newBuilder()
                         .setServiceAccountEmail(serviceAccount)
