@@ -58,8 +58,8 @@
           <div class="bg-muted/50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-20">
             <div class="max-w-3xl mx-auto text-center">
               <h2 class="text-3xl font-bold mb-6">Ready to Create Amazing Content?</h2>
-              <p class="text-lg text-muted-foreground mb-8">
-                Join thousands of content creators who are already using RecapGrid to create viral-worthy videos.
+              <p>
+                Create short-form videos that captivate your audience.
               </p>
               <NuxtLink to="/dashboard">
                 <Button size="lg" class="bg-primary text-primary-foreground hover:bg-primary/90">
@@ -116,38 +116,23 @@
     {
       icon: TypeIcon,
       title: 'Auto Captions',
-      description: 'Generate accurate captions in multiple languages with perfect timing.'
+      description: 'Generate accurate captions of the narration with perfect timing.'
     },
     {
       icon: MusicIcon,
       title: 'AI Music Match',
       description: 'Get AI-recommended background music that matches your content perfectly.'
     },
-    {
-      icon: ScissorsIcon,
-      title: 'Perfect Cuts',
-      description: 'Automatically trim and cut your videos to the ideal length for each platform.'
-    },
-    {
-      icon: BrainIcon,
-      title: 'AI Overview',
-      description: 'Get smart suggestions and insights to optimize your content performance.'
-    },
-    {
-      icon: SparklesIcon,
-      title: 'Voice Enhancement',
-      description: 'Crystal clear voice-overs and audio enhancement powered by AI.'
-    }
   ]
   
   const steps = [
     {
       title: 'Upload Your Video',
-      description: 'Simply drag and drop your video file or paste a URL to get started.'
+      description: 'Simply drag and drop your video file to get started. Any videos are automatically deleted after 8 hours.'
     },
     {
       title: 'AI Processing',
-      description: 'Our AI analyzes your content and applies smart enhancements automatically.'
+      description: 'Our AI analyzes your content and processes your final video.'
     },
     {
       title: 'Download & Share',
