@@ -355,7 +355,14 @@
         },
         (payload) => {
           console.log('New processed video:', payload.new)
-          videos.value.push(payload.new);
+          newVideo = {
+            id: payload.new.id,
+            fileUrl: payload.new.file_url,
+            fileName: payload.new.file_name,
+            uploadedAt: payload.new.uploaded_at,
+            userId: payload.new.user_id,
+          }
+          videos.value.push(newVideo);
         }
       )
       .subscribe((status) => {
