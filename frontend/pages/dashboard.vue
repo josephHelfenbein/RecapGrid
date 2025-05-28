@@ -60,7 +60,7 @@
                   <div class="flex flex-col items-center gap-1">
                     <h3 class="font-medium">Drop your video here</h3>
                     <p class="text-sm text-muted-foreground">
-                      or click to browse (MP4 or MOV, up to 50MB)
+                      or click to browse (MP4 or MOV, up to 30MB)
                     </p>
                   </div>
                 </div>
@@ -240,8 +240,8 @@
   }
 
   const uploadVideo = async (file) => {
-    if(file.size > 50 * 1024 * 1024) {
-      alertNew("File size exceeds 50MB limit.");
+    if(file.size > 30 * 1024 * 1024) {
+      alertNew("File size exceeds 30MB limit.");
       return;
     }
     if(file.type !== "video/mp4" && file.type !== "video/quicktime") {
