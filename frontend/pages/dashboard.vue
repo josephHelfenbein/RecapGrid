@@ -244,8 +244,8 @@
       alertNew("File size exceeds 50MB limit.");
       return;
     }
-    if(file.type !== "video/mp4") {
-      alertNew("Only MP4 files are supported.");
+    if(file.type !== "video/mp4" && file.type !== "video/mov") {
+      alertNew("Unsupported file format.");
       return;
     }
     if(!user.value) {
