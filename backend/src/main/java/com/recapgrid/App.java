@@ -897,7 +897,10 @@ public class App {
         return safe.replaceAll("_+", "_");
     }
     
-    @PostMapping("/videos/upload")
+    @PostMapping(
+        value    = "/videos/upload",
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     public ResponseEntity<Video> uploadVideo(
         @RequestParam("userId") String userId,
         @RequestParam("fileData") MultipartFile fileData,
