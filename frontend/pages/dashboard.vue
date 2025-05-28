@@ -66,7 +66,7 @@
                 </div>
                 <input
                   type="file"
-                  accept="video/mp4, video/mov"
+                  accept="video/mp4, video/quicktime"
                   class="hidden"
                   ref="fileInput"
                   @change="handleFileSelect"
@@ -244,7 +244,7 @@
       alertNew("File size exceeds 50MB limit.");
       return;
     }
-    if(file.type !== "video/mp4" && file.type !== "video/mov") {
+    if(file.type !== "video/mp4" && file.type !== "video/quicktime") {
       alertNew("Unsupported file format.");
       return;
     }
