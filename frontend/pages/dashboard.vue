@@ -60,13 +60,13 @@
                   <div class="flex flex-col items-center gap-1">
                     <h3 class="font-medium">Drop your video here</h3>
                     <p class="text-sm text-muted-foreground">
-                      or click to browse (MP4 up to 50MB)
+                      or click to browse (MP4 or MOV, up to 50MB)
                     </p>
                   </div>
                 </div>
                 <input
                   type="file"
-                  accept="video/mp4"
+                  accept="video/mp4, video/mov"
                   class="hidden"
                   ref="fileInput"
                   @change="handleFileSelect"

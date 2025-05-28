@@ -25,6 +25,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
@@ -908,20 +909,52 @@ public class App {
 
         updateInfo(userId, "", "Uploading video...");
 
-        String uploadUrl = UriComponentsBuilder
-            .fromHttpUrl(supabaseUrl)
-            .pathSegment("storage", "v1", "object", "videos", userId, safeName)
-            .build()
-            .encode()
-            .toUriString();
-
-        HttpHeaders headers = createHeaders();
-        headers.set("Content-Type", fileData.getContentType());
-
-        HttpEntity<ByteArrayResource> uploadEntity;
+        boolean needsTranscode = safeName.toLowerCase().endsWith(".mov");
+        Path uploadSource;
+        String finalName;
         try {
-            ByteArrayResource resource = new ByteArrayResource(fileData.getBytes());
-            uploadEntity = new HttpEntity<>(resource, headers);
+            if(needsTranscode){
+                updateInfo(userId, "Transcoding video...", "Uploading video...");
+                Path movPath = Files.createTempFile("upload-", ".mov");
+                fileData.transferTo(movPath.toFile());
+                finalName = safeName.replaceAll(".mov", ".mp4");
+                uploadSource = Files.createTempFile("upload-", ".mp4");
+                ProcessBuilder processBuilder = new ProcessBuilder(
+                    "ffmpeg", "-y",
+                    "-i", movPath.toString(),
+                    "-c:v", "libx264",
+                    "-preset", "ultrafast",
+                    "-crf", "30",
+                    "-c:a", "aac",
+                    "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    uploadSource.toString()
+                );
+                processBuilder.inheritIO();
+                int code = processBuilder.start().waitFor();
+                Files.deleteIfExists(movPath);
+                if(code != 0) {
+                    logger.error("Error transcoding video '{}', Code: {}", fileName, code);
+                    updateInfo(userId, "Error transcoding video", "There was an error processing the video");
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
+            } else{
+                finalName = safeName;
+                uploadSource = Files.createTempFile("upload-", "-" + finalName);
+                fileData.transferTo(uploadSource.toFile());
+            }
+
+            String uploadUrl = UriComponentsBuilder
+                .fromHttpUrl(supabaseUrl)
+                .pathSegment("storage", "v1", "object", "videos", userId, finalName)
+                .build()
+                .encode()
+                .toUriString();
+            FileSystemResource fsr = new FileSystemResource(uploadSource.toFile());
+
+            HttpHeaders headers = createHeaders();
+            headers.setContentType(MediaType.parseMediaType(fileData.getContentType()));
+            HttpEntity<FileSystemResource> uploadEntity = new HttpEntity<>(fsr, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, uploadEntity, String.class);
 
@@ -929,17 +962,17 @@ public class App {
                 updateInfo(userId, "", "Video uploaded successfully");
                 String publicUrl = UriComponentsBuilder
                     .fromHttpUrl(supabaseUrl)
-                    .pathSegment("storage", "v1", "object", "public", "videos", userId, safeName)
+                    .pathSegment("storage", "v1", "object", "public", "videos", userId, finalName)
                     .build()
                     .encode()
                     .toUriString();
                 
-                Video saving = new Video(userId, safeName, publicUrl);
+                Video saving = new Video(userId, finalName, publicUrl);
                 videoRepository.save(saving);
                 logger.info("Video uploaded successfully: {}", publicUrl);
                 return ResponseEntity.ok(saving);
             } else {
-                logger.error("Error uploading video '{}', Status: {}, Response: {}", safeName, response.getStatusCode(), response.getBody());
+                logger.error("Error uploading video '{}', Status: {}, Response: {}", finalName, response.getStatusCode(), response.getBody());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
         } catch (Exception e) {
